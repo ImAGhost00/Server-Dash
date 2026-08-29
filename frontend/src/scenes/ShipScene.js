@@ -12,6 +12,13 @@ const PALETTE = {
   danger: 0xff6b6b,
 };
 
+function formatStorageValue(gb) {
+  if (gb >= 1024) {
+    return `${(gb / 1024).toFixed(2)} TB`;
+  }
+  return `${gb.toFixed(1)} GB`;
+}
+
 class ShipScene extends Phaser.Scene {
   constructor() {
     super('ShipScene');
@@ -24,18 +31,24 @@ class ShipScene extends Phaser.Scene {
 
     this.wsUrl = `${socketProtocol}://${socketHost}/ws`;
     this.roomRegistry = [
-      { id: 'engine', name: 'Engine Room', x: 0.18, y: 0.45, width: 0.28, height: 0.48 },
-      { id: 'storage', name: 'Storage Room', x: 0.56, y: 0.45, width: 0.26, height: 0.48 },
+      { id: 'engine', name: 'Engine Room', x: 0.16, y: 0.45, width: 0.26, height: 0.48 },
+      { id: 'storage', name: 'Storage Room', x: 0.5, y: 0.45, width: 0.24, height: 0.48 },
+      { id: 'mediapool', name: 'Media Pool', x: 0.82, y: 0.45, width: 0.24, height: 0.48 },
     ];
     this.metrics = {
       cpu_percent: 0,
       ram_percent: 0,
       disk_percent: 0,
       disk_used_gb: 0,
-      disk_free_gb: 0,
+      disk_total_gb: 0,
+      media_percent: 0,
+      media_used_gb: 0,
+      media_total_gb: 0,
+      media_available: false,
     };
     this.socket = null;
     this.storageOpen = false;
+    this.mediaOpen = false;
   }
 
   create() {
@@ -164,14 +177,14 @@ class ShipScene extends Phaser.Scene {
           color: '#e6d9ff',
         }).setOrigin(0.5);
 
-        room.freeLabel = this.add.text(room.x + 58, room.y - 12, 'FREE', {
+        room.totalLabel = this.add.text(room.x + 58, room.y - 12, 'TOTAL', {
           fontFamily: 'monospace',
           fontSize: '12px',
           color: '#bfa9db',
           letterSpacing: '0.12em',
         }).setOrigin(0.5);
 
-        room.freeValue = this.add.text(room.x + 58, room.y + 16, '0 GB', {
+        room.totalValue = this.add.text(room.x + 58, room.y + 16, '0 GB', {
           fontFamily: 'monospace',
           fontSize: '22px',
           color: '#e6d9ff',
@@ -187,9 +200,48 @@ class ShipScene extends Phaser.Scene {
         room.background.setInteractive({ useHandCursor: true });
         room.background.on('pointerdown', () => this.toggleStorageWindow(room));
       }
+
+      if (config.id === 'mediapool') {
+        room.usedLabel = this.add.text(room.x - 58, room.y - 12, 'USED', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#bfa9db',
+          letterSpacing: '0.12em',
+        }).setOrigin(0.5);
+
+        room.usedValue = this.add.text(room.x - 58, room.y + 16, '0 GB', {
+          fontFamily: 'monospace',
+          fontSize: '20px',
+          color: '#e6d9ff',
+        }).setOrigin(0.5);
+
+        room.totalLabel = this.add.text(room.x + 58, room.y - 12, 'TOTAL', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#bfa9db',
+          letterSpacing: '0.12em',
+        }).setOrigin(0.5);
+
+        room.totalValue = this.add.text(room.x + 58, room.y + 16, '0 GB', {
+          fontFamily: 'monospace',
+          fontSize: '20px',
+          color: '#e6d9ff',
+        }).setOrigin(0.5);
+
+        room.status = this.add.text(room.x, room.y + 62, 'CLICK TO INSPECT', {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#7ef7d6',
+          letterSpacing: '0.12em',
+        }).setOrigin(0.5);
+
+        room.background.setInteractive({ useHandCursor: true });
+        room.background.on('pointerdown', () => this.toggleMediaWindow(room));
+      }
     });
 
     this.createStorageWindow();
+    this.createMediaWindow();
   }
 
   createModuleRoom(roomConfig) {
@@ -234,7 +286,7 @@ class ShipScene extends Phaser.Scene {
       color: '#e6d9ff',
     });
 
-    const freeText = this.add.text(80, -12, 'Free: 0 GB', {
+    const totalText = this.add.text(80, -12, 'Total: 0 GB', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#e6d9ff',
@@ -254,9 +306,9 @@ class ShipScene extends Phaser.Scene {
       letterSpacing: '0.08em',
     }).setOrigin(0.5);
 
-    this.storageWindow.add([backdrop, header, usedText, freeText, healthText, hintText]);
+    this.storageWindow.add([backdrop, header, usedText, totalText, healthText, hintText]);
     this.storageUsedText = usedText;
-    this.storageFreeText = freeText;
+    this.storageTotalText = totalText;
     this.storageHealthText = healthText;
   }
 
@@ -272,12 +324,91 @@ class ShipScene extends Phaser.Scene {
     }
   }
 
+  createMediaWindow() {
+    const { width, height } = this.scale;
+
+    this.mediaWindow = this.add.container(width * 0.5, height * 0.52);
+    this.mediaWindow.setVisible(false);
+
+    const backdrop = this.add.rectangle(0, 0, 460, 320, 0x120b1b, 0.96);
+    backdrop.setStrokeStyle(2, PALETTE.accent, 0.8);
+
+    const header = this.add.text(0, -140, 'MEDIA POOL BREAKDOWN', {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#f3ebff',
+      letterSpacing: '0.1em',
+    }).setOrigin(0.5);
+
+    const summaryText = this.add.text(0, -100, 'Used: 0 GB / Total: 0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#d4bbff',
+    }).setOrigin(0.5);
+
+    const categoryText = this.add.text(-200, -70, 'Loading categories...', {
+      fontFamily: 'monospace',
+      fontSize: '14px',
+      color: '#e6d9ff',
+      lineSpacing: 8,
+    });
+
+    const hintText = this.add.text(0, 138, 'click the room again to close', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#bfa9db',
+      letterSpacing: '0.08em',
+    }).setOrigin(0.5);
+
+    this.mediaWindow.add([backdrop, header, summaryText, categoryText, hintText]);
+    this.mediaSummaryText = summaryText;
+    this.mediaCategoryText = categoryText;
+  }
+
+  toggleMediaWindow(room) {
+    this.mediaOpen = !this.mediaOpen;
+    this.mediaWindow.setVisible(this.mediaOpen);
+
+    if (this.mediaOpen) {
+      room.background.setFillStyle(0x26163a, 0.98);
+      room.background.setStrokeStyle(2, PALETTE.good, 0.9);
+      this.loadMediaBreakdown();
+    } else {
+      room.background.setFillStyle(PALETTE.panelFill, 0.94);
+      room.background.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
+    }
+  }
+
+  async loadMediaBreakdown() {
+    this.mediaCategoryText.setText('Loading categories...');
+
+    try {
+      const response = await fetch('/mediapool/breakdown');
+      const data = await response.json();
+
+      if (!data.available || !data.categories || data.categories.length === 0) {
+        this.mediaCategoryText.setText('Media pool not mounted.\nSet MEDIA_POOL_PATH in docker-compose.yml.');
+        return;
+      }
+
+      const lines = data.categories.map((category) => `${category.name.padEnd(16, ' ')} ${formatStorageValue(category.used_gb)}`);
+      this.mediaCategoryText.setText(lines.join('\n'));
+    } catch (error) {
+      this.mediaCategoryText.setText('Could not load breakdown.');
+      console.error('Media pool breakdown failed', error);
+    }
+  }
+
   updateRoomTelemetry() {
     const cpu = Math.max(0, Math.min(100, this.metrics.cpu_percent || 0));
     const ram = Math.max(0, Math.min(100, this.metrics.ram_percent || 0));
     const disk = Math.max(0, Math.min(100, this.metrics.disk_percent || 0));
     const usedGb = Number(this.metrics.disk_used_gb || 0);
-    const freeGb = Number(this.metrics.disk_free_gb || 0);
+    const totalGb = Number(this.metrics.disk_total_gb || 0);
+    const mediaPercent = Math.max(0, Math.min(100, this.metrics.media_percent || 0));
+    const mediaUsedGb = Number(this.metrics.media_used_gb || 0);
+    const mediaTotalGb = Number(this.metrics.media_total_gb || 0);
+    const mediaAvailable = Boolean(this.metrics.media_available);
     const warning = cpu > 80;
 
     const engineRoom = this.roomMap.get('engine');
@@ -305,15 +436,30 @@ class ShipScene extends Phaser.Scene {
     });
 
     const storageRoom = this.roomMap.get('storage');
-    storageRoom.usedValue.setText(`${usedGb.toFixed(1)} GB`);
-    storageRoom.freeValue.setText(`${freeGb.toFixed(1)} GB`);
+    storageRoom.usedValue.setText(formatStorageValue(usedGb));
+    storageRoom.totalValue.setText(formatStorageValue(totalGb));
     storageRoom.status.setText(disk > 80 ? 'DRIVE NEAR LIMIT' : 'CLICK TO INSPECT');
     storageRoom.status.setColor(disk > 80 ? '#f9c74f' : '#7ef7d6');
 
-    this.storageUsedText.setText(`Used: ${usedGb.toFixed(1)} GB`);
-    this.storageFreeText.setText(`Free: ${freeGb.toFixed(1)} GB`);
+    this.storageUsedText.setText(`Used: ${formatStorageValue(usedGb)}`);
+    this.storageTotalText.setText(`Total: ${formatStorageValue(totalGb)}`);
     this.storageHealthText.setText(disk > 80 ? 'Status: WATCH' : 'Status: HEALTHY');
     this.storageHealthText.setColor(disk > 80 ? '#f9c74f' : '#7ef7d6');
+
+    const mediaRoom = this.roomMap.get('mediapool');
+    mediaRoom.usedValue.setText(mediaAvailable ? formatStorageValue(mediaUsedGb) : 'N/A');
+    mediaRoom.totalValue.setText(mediaAvailable ? formatStorageValue(mediaTotalGb) : 'N/A');
+    if (!mediaAvailable) {
+      mediaRoom.status.setText('NOT MOUNTED');
+      mediaRoom.status.setColor('#ff6b6b');
+    } else {
+      mediaRoom.status.setText(mediaPercent > 90 ? 'POOL NEAR LIMIT' : 'CLICK TO INSPECT');
+      mediaRoom.status.setColor(mediaPercent > 90 ? '#f9c74f' : '#7ef7d6');
+    }
+
+    this.mediaSummaryText.setText(mediaAvailable
+      ? `Used: ${formatStorageValue(mediaUsedGb)} / Total: ${formatStorageValue(mediaTotalGb)}`
+      : 'Media pool volume not mounted');
   }
 }
 

@@ -9,6 +9,10 @@ services:
     ports:
       - "8801:8000"
     restart: unless-stopped
+    environment:
+      - MEDIA_POOL_PATH=/mnt/mediapool
+    volumes:
+      - /media/MediaPool:/mnt/mediapool:ro
     labels:
       - "org.opencontainers.image.source=https://github.com/ImAGhost00/Server-Dash"
     healthcheck:
