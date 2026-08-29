@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spaceship Station</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    <style>
+      :root {
+        --bg: #050b11;
+        --panel: #0e1a22;
+        --metal: #4f5b64;
+        --metal-light: #7d8a93;
+        --accent: #7ef9c6;
+        --warning: #f9c74f;
+        --danger: #ff6b6b;
+      }
+
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: radial-gradient(circle at top, #0d1d27, #050b11 52%);
+        color: #d7f7ef;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+
+      body {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      #game-shell {
+        width: min(92vw, 1400px);
+        height: min(86vh, 820px);
+        border: 2px solid rgba(126, 249, 198, 0.35);
+        background: rgba(5, 11, 17, 0.9);
+        box-shadow: 0 0 24px rgba(126, 249, 198, 0.12);
+        overflow: hidden;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game-shell"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
