@@ -7,7 +7,7 @@ services:
       context: ./backend
     container_name: spaceship-backend
     ports:
-      - "8000:8000"
+      - "8801:8000"
     restart: unless-stopped
     labels:
       - "org.opencontainers.image.source=https://github.com/ImAGhost00/Server-Dash"
@@ -22,7 +22,7 @@ services:
       context: ./frontend
     container_name: spaceship-frontend
     ports:
-      - "80:80"
+      - "8802:80"
     depends_on:
       - backend
     restart: unless-stopped
