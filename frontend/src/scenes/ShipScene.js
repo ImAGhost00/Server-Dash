@@ -1,21 +1,45 @@
+const PALETTE = {
+  bg: 0x0b0414,
+  panelFill: 0x1a1028,
+  panelStroke: 0x9b7fc4,
+  titleBarFill: 0x2e1d42,
+  gridLine: 0xb388ff,
+  accent: 0xb388ff,
+  accentBright: 0xd4bbff,
+  gaugeTrack: 0x2a1a45,
+  good: 0x7ef7d6,
+  warning: 0xf9c74f,
+  danger: 0xff6b6b,
+};
+
 class ShipScene extends Phaser.Scene {
   constructor() {
     super('ShipScene');
-    this.wsUrl = `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
+
+    const socketHost = window.location.port === '8802'
+      ? 'localhost:8801'
+      : window.location.host;
+    const socketProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+
+    this.wsUrl = `${socketProtocol}://${socketHost}/ws`;
     this.roomRegistry = [
-      { id: 'engine', name: 'Engine Room', x: 0.32, y: 0.38, width: 0.24, height: 0.36 },
+      { id: 'engine', name: 'Engine Room', x: 0.18, y: 0.45, width: 0.28, height: 0.48 },
+      { id: 'storage', name: 'Storage Room', x: 0.56, y: 0.45, width: 0.26, height: 0.48 },
     ];
     this.metrics = {
       cpu_percent: 0,
       ram_percent: 0,
       disk_percent: 0,
+      disk_used_gb: 0,
+      disk_free_gb: 0,
     };
     this.socket = null;
+    this.storageOpen = false;
   }
 
   create() {
-    this.cameras.main.setBackgroundColor('#050b11');
-    this.createStationHull();
+    this.cameras.main.setBackgroundColor(PALETTE.bg);
+    this.createStationFrame();
     this.createRoomModules();
     this.connectSocket();
   }
@@ -23,16 +47,12 @@ class ShipScene extends Phaser.Scene {
   connectSocket() {
     this.socket = new WebSocket(this.wsUrl);
 
-    this.socket.addEventListener('open', () => {
-      console.log('WebSocket connected');
-    });
-
     this.socket.addEventListener('message', (event) => {
       try {
         const payload = JSON.parse(event.data);
         if (payload.type === 'metrics' && payload.data) {
           this.metrics = payload.data;
-          this.updateEngineRoomTelemetry();
+          this.updateRoomTelemetry();
         }
       } catch (error) {
         console.error('Invalid websocket payload', error);
@@ -40,85 +60,135 @@ class ShipScene extends Phaser.Scene {
     });
 
     this.socket.addEventListener('close', () => {
-      console.warn('WebSocket disconnected, retrying...');
       setTimeout(() => this.connectSocket(), 2000);
     });
   }
 
-  createStationHull() {
+  createStationFrame() {
     const { width, height } = this.scale;
 
-    this.add.rectangle(width * 0.5, height * 0.57, width * 0.9, height * 0.52, 0x1d2f35, 1)
-      .setStrokeStyle(3, 0x7ef9c6, 0.7);
+    this.add.text(width * 0.5, height * 0.08, 'STATION GRID', {
+      fontFamily: 'monospace',
+      fontSize: '30px',
+      color: '#e6d9ff',
+      letterSpacing: '0.24em',
+    }).setOrigin(0.5);
 
-    this.add.rectangle(width * 0.5, height * 0.5, width * 0.72, height * 0.7, 0x3a4a4e, 0.28)
-      .setStrokeStyle(2, 0x90a4ab, 0.8);
+    const grid = this.add.graphics();
+    grid.lineStyle(1, PALETTE.gridLine, 0.12);
 
-    for (let i = 0; i < 12; i += 1) {
-      const y = height * 0.18 + i * (height * 0.055);
-      this.add.line(0, y, width * 0.12, y, width * 0.88, y, 0x7ef9c6, 0.28).setLineWidth(1);
+    for (let x = 0; x <= 12; x += 1) {
+      const px = width * (x / 12);
+      grid.lineBetween(px, height * 0.16, px, height * 0.86);
     }
 
-    this.add.rectangle(width * 0.5, height * 0.78, width * 0.78, 10, 0x7ef9c6, 0.35);
-    this.add.rectangle(width * 0.5, height * 0.85, width * 0.68, 8, 0x7ef9c6, 0.18);
-
-    const stern = this.add.rectangle(width * 0.14, height * 0.58, 18, height * 0.5, 0x7ef9c6, 0.15);
-    const bow = this.add.rectangle(width * 0.86, height * 0.58, 18, height * 0.5, 0x7ef9c6, 0.15);
-    stern.setStrokeStyle(2, 0x7ef9c6, 0.4);
-    bow.setStrokeStyle(2, 0x7ef9c6, 0.4);
-
-    this.add.text(width * 0.5, height * 0.12, 'SPACESHIP STATION', {
-      fontFamily: 'monospace',
-      fontSize: '22px',
-      color: '#7ef9c6',
-      letterSpacing: '0.22em',
-    }).setOrigin(0.5);
+    for (let y = 0; y <= 8; y += 1) {
+      const py = height * (y / 8);
+      grid.lineBetween(width * 0.08, py, width * 0.92, py);
+    }
   }
 
   createRoomModules() {
-    this.engineRoom = this.createModuleRoom(this.roomRegistry[0]);
-    this.engineRoomText = this.add.text(this.engineRoom.x, this.engineRoom.y - 14, 'ENGINE ROOM / CORE INTELLIGENCE', {
-      fontFamily: 'monospace',
-      fontSize: '15px',
-      color: '#d7f7ef',
-      backgroundColor: 'rgba(0,0,0,0.2)',
-      padding: { x: 8, y: 4 },
-    }).setOrigin(0.5);
+    this.roomMap = new Map();
 
-    this.engineCore = this.add.circle(this.engineRoom.x, this.engineRoom.y + 12, 24, 0x7ef9c6, 0.9);
-    this.engineCore.setStrokeStyle(2, 0x9af6d0, 1);
-    this.engineCoreGlow = this.add.circle(this.engineRoom.x, this.engineRoom.y + 12, 42, 0x7ef9c6, 0.18);
+    this.roomRegistry.forEach((config) => {
+      const room = this.createModuleRoom(config);
+      this.roomMap.set(config.id, room);
 
-    this.cpuText = this.add.text(this.engineRoom.x - 54, this.engineRoom.y + 66, 'CPU 0%', {
-      fontFamily: 'monospace',
-      fontSize: '15px',
-      color: '#7ef9c6',
+      room.label = this.add.text(room.x, room.y - room.height / 2 - 26, config.name.toUpperCase(), {
+        fontFamily: 'monospace',
+        fontSize: '12px',
+        color: '#f3ebff',
+        letterSpacing: '0.12em',
+        backgroundColor: 'rgba(15, 10, 22, 0.85)',
+        padding: { x: 8, y: 4 },
+      }).setOrigin(0.5).setVisible(false);
+
+      room.background.setInteractive({ useHandCursor: true });
+      room.background.on('pointerover', () => {
+        room.label.setVisible(true);
+        room.background.setStrokeStyle(2, PALETTE.accentBright, 1);
+      });
+      room.background.on('pointerout', () => {
+        room.label.setVisible(false);
+        room.background.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
+      });
+
+      if (config.id === 'engine') {
+        room.coreGlow = this.add.circle(room.x, room.y - 80, 48, PALETTE.accent, 0.18);
+        room.core = this.add.circle(room.x, room.y - 80, 26, PALETTE.accent, 0.9);
+        room.core.setStrokeStyle(2, PALETTE.accentBright, 1);
+
+        room.cpuLabel = this.add.text(room.x - 82, room.y + 10, 'CPU 0%', {
+          fontFamily: 'monospace',
+          fontSize: '15px',
+          color: '#d4bbff',
+        }).setOrigin(0.5);
+
+        room.ramLabel = this.add.text(room.x + 82, room.y + 10, 'RAM 0%', {
+          fontFamily: 'monospace',
+          fontSize: '15px',
+          color: '#d4bbff',
+        }).setOrigin(0.5);
+
+        room.cpuGauge = this.add.rectangle(room.x - 82, room.y + 36, 120, 10, PALETTE.gaugeTrack, 1)
+          .setStrokeStyle(1, PALETTE.panelStroke, 0.7);
+        room.cpuGaugeFill = this.add.rectangle(room.x - 142, room.y + 36, 0, 8, PALETTE.accent, 1).setOrigin(0, 0.5);
+
+        room.ramGauge = this.add.rectangle(room.x + 82, room.y + 36, 120, 10, PALETTE.gaugeTrack, 1)
+          .setStrokeStyle(1, PALETTE.panelStroke, 0.7);
+        room.ramGaugeFill = this.add.rectangle(room.x + 22, room.y + 36, 0, 8, PALETTE.accent, 1).setOrigin(0, 0.5);
+
+        room.pulse = this.tweens.add({
+          targets: [room.coreGlow],
+          scale: { from: 1, to: 1.7 },
+          duration: 1000,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+      }
+
+      if (config.id === 'storage') {
+        room.usedLabel = this.add.text(room.x - 58, room.y - 12, 'USED', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#bfa9db',
+          letterSpacing: '0.12em',
+        }).setOrigin(0.5);
+
+        room.usedValue = this.add.text(room.x - 58, room.y + 16, '0 GB', {
+          fontFamily: 'monospace',
+          fontSize: '22px',
+          color: '#e6d9ff',
+        }).setOrigin(0.5);
+
+        room.freeLabel = this.add.text(room.x + 58, room.y - 12, 'FREE', {
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          color: '#bfa9db',
+          letterSpacing: '0.12em',
+        }).setOrigin(0.5);
+
+        room.freeValue = this.add.text(room.x + 58, room.y + 16, '0 GB', {
+          fontFamily: 'monospace',
+          fontSize: '22px',
+          color: '#e6d9ff',
+        }).setOrigin(0.5);
+
+        room.status = this.add.text(room.x, room.y + 62, 'CLICK TO INSPECT', {
+          fontFamily: 'monospace',
+          fontSize: '11px',
+          color: '#7ef7d6',
+          letterSpacing: '0.12em',
+        }).setOrigin(0.5);
+
+        room.background.setInteractive({ useHandCursor: true });
+        room.background.on('pointerdown', () => this.toggleStorageWindow(room));
+      }
     });
 
-    this.ramText = this.add.text(this.engineRoom.x + 10, this.engineRoom.y + 66, 'RAM 0%', {
-      fontFamily: 'monospace',
-      fontSize: '15px',
-      color: '#7ef9c6',
-    });
-
-    this.engineGaugeCpu = this.add.rectangle(this.engineRoom.x - 48, this.engineRoom.y + 92, 92, 10, 0x2a3b3d, 1);
-    this.engineGaugeCpu.setStrokeStyle(1, 0x7ef9c6, 0.7);
-    this.engineGaugeCpuFill = this.add.rectangle(this.engineRoom.x - 48, this.engineRoom.y + 92, 0, 8, 0x7ef9c6, 1);
-    this.engineGaugeCpuFill.setOrigin(0, 0.5);
-
-    this.engineGaugeRam = this.add.rectangle(this.engineRoom.x + 54, this.engineRoom.y + 92, 92, 10, 0x2a3b3d, 1);
-    this.engineGaugeRam.setStrokeStyle(1, 0x7ef9c6, 0.7);
-    this.engineGaugeRamFill = this.add.rectangle(this.engineRoom.x + 54, this.engineRoom.y + 92, 0, 8, 0x7ef9c6, 1);
-    this.engineGaugeRamFill.setOrigin(0, 0.5);
-
-    this.enginePulse = this.tweens.add({
-      targets: [this.engineCoreGlow],
-      scale: { from: 1, to: 1.65 },
-      duration: 900,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
+    this.createStorageWindow();
   }
 
   createModuleRoom(roomConfig) {
@@ -128,57 +198,121 @@ class ShipScene extends Phaser.Scene {
     const roomWidth = width * roomConfig.width;
     const roomHeight = height * roomConfig.height;
 
-    const room = this.add.rectangle(roomX, roomY, roomWidth, roomHeight, 0x182a2e, 0.8);
-    room.setStrokeStyle(2, 0x8ea7ab, 0.9);
-
-    const titleBar = this.add.rectangle(roomX, roomY - roomHeight * 0.45, roomWidth * 0.8, 18, 0x213a40, 1);
-    titleBar.setStrokeStyle(1, 0x7ef9c6, 0.7);
+    const room = this.add.rectangle(roomX, roomY, roomWidth, roomHeight, PALETTE.panelFill, 0.94);
+    room.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
 
     return {
+      id: roomConfig.id,
       x: roomX,
       y: roomY,
       width: roomWidth,
       height: roomHeight,
       background: room,
-      title: titleBar,
     };
   }
 
-  updateEngineRoomTelemetry() {
+  createStorageWindow() {
+    const { width, height } = this.scale;
+
+    this.storageWindow = this.add.container(width * 0.5, height * 0.52);
+    this.storageWindow.setVisible(false);
+
+    const backdrop = this.add.rectangle(0, 0, 430, 240, 0x120b1b, 0.96);
+    backdrop.setStrokeStyle(2, PALETTE.accent, 0.8);
+
+    const header = this.add.text(0, -82, 'DRIVE HEALTH', {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#f3ebff',
+      letterSpacing: '0.12em',
+    }).setOrigin(0.5);
+
+    const usedText = this.add.text(-140, -12, 'Used: 0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#e6d9ff',
+    });
+
+    const freeText = this.add.text(80, -12, 'Free: 0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '18px',
+      color: '#e6d9ff',
+    });
+
+    const healthText = this.add.text(0, 40, 'Status: HEALTHY', {
+      fontFamily: 'monospace',
+      fontSize: '16px',
+      color: '#7ef7d6',
+      letterSpacing: '0.08em',
+    }).setOrigin(0.5);
+
+    const hintText = this.add.text(0, 78, 'click the room again to close', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#bfa9db',
+      letterSpacing: '0.08em',
+    }).setOrigin(0.5);
+
+    this.storageWindow.add([backdrop, header, usedText, freeText, healthText, hintText]);
+    this.storageUsedText = usedText;
+    this.storageFreeText = freeText;
+    this.storageHealthText = healthText;
+  }
+
+  toggleStorageWindow(room) {
+    this.storageOpen = !this.storageOpen;
+    this.storageWindow.setVisible(this.storageOpen);
+    if (this.storageOpen) {
+      room.background.setFillStyle(0x26163a, 0.98);
+      room.background.setStrokeStyle(2, PALETTE.good, 0.9);
+    } else {
+      room.background.setFillStyle(PALETTE.panelFill, 0.94);
+      room.background.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
+    }
+  }
+
+  updateRoomTelemetry() {
     const cpu = Math.max(0, Math.min(100, this.metrics.cpu_percent || 0));
     const ram = Math.max(0, Math.min(100, this.metrics.ram_percent || 0));
+    const disk = Math.max(0, Math.min(100, this.metrics.disk_percent || 0));
+    const usedGb = Number(this.metrics.disk_used_gb || 0);
+    const freeGb = Number(this.metrics.disk_free_gb || 0);
     const warning = cpu > 80;
 
-    this.cpuText.setText(`CPU ${cpu.toFixed(1)}%`);
-    this.ramText.setText(`RAM ${ram.toFixed(1)}%`);
+    const engineRoom = this.roomMap.get('engine');
+    engineRoom.cpuLabel.setText(`CPU ${cpu.toFixed(1)}%`);
+    engineRoom.ramLabel.setText(`RAM ${ram.toFixed(1)}%`);
+    engineRoom.cpuGaugeFill.width = 120 * (cpu / 100);
+    engineRoom.ramGaugeFill.width = 120 * (ram / 100);
+    engineRoom.cpuGaugeFill.fillColor = warning ? PALETTE.warning : PALETTE.accent;
+    engineRoom.ramGaugeFill.fillColor = ram > 80 ? PALETTE.danger : PALETTE.accent;
+    engineRoom.background.setFillStyle(warning ? 0x3a2015 : PALETTE.panelFill, 0.94);
+    engineRoom.background.setStrokeStyle(2, warning ? PALETTE.warning : PALETTE.panelStroke, 0.9);
+    engineRoom.coreGlow.setFillStyle(warning ? PALETTE.danger : PALETTE.accent, 0.2);
+    engineRoom.core.setFillStyle(warning ? PALETTE.warning : PALETTE.accent, 0.95);
 
-    const cpuWidth = 92 * (cpu / 100);
-    const ramWidth = 92 * (ram / 100);
-
-    this.engineGaugeCpuFill.width = cpuWidth;
-    this.engineGaugeCpuFill.fillColor = warning ? 0xf9c74f : 0x7ef9c6;
-    this.engineGaugeRamFill.width = ramWidth;
-    this.engineGaugeRamFill.fillColor = ram > 80 ? 0xff6b6b : 0x7ef9c6;
-
-    this.engineRoom.background.setFillStyle(warning ? 0x3a2a1b : 0x182a2e, 0.82);
-    this.engineRoom.background.setStrokeStyle(2, warning ? 0xf9c74f : 0x8ea7ab, 0.9);
-
-    const baseDuration = 1200;
     const pulseFactor = 1 + (cpu / 100) * 1.8;
-    const newDuration = Math.max(300, baseDuration / pulseFactor);
-    this.enginePulse.stop();
-    this.enginePulse = this.tweens.add({
-      targets: [this.engineCoreGlow],
-      scale: { from: 1, to: 1.65 },
+    const newDuration = Math.max(350, 1200 / pulseFactor);
+    engineRoom.pulse.stop();
+    engineRoom.pulse = this.tweens.add({
+      targets: [engineRoom.coreGlow],
+      scale: { from: 1, to: 1.7 },
       duration: newDuration,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
 
-    this.engineCoreGlow.setFillStyle(warning ? 0xff6b6b : 0x7ef9c6, 0.2);
-    this.engineCore.setFillStyle(warning ? 0xffad60 : 0x7ef9c6, 0.95);
-    this.engineCoreGlow.setAlpha(Math.min(1, 0.18 + cpu / 250));
+    const storageRoom = this.roomMap.get('storage');
+    storageRoom.usedValue.setText(`${usedGb.toFixed(1)} GB`);
+    storageRoom.freeValue.setText(`${freeGb.toFixed(1)} GB`);
+    storageRoom.status.setText(disk > 80 ? 'DRIVE NEAR LIMIT' : 'CLICK TO INSPECT');
+    storageRoom.status.setColor(disk > 80 ? '#f9c74f' : '#7ef7d6');
+
+    this.storageUsedText.setText(`Used: ${usedGb.toFixed(1)} GB`);
+    this.storageFreeText.setText(`Free: ${freeGb.toFixed(1)} GB`);
+    this.storageHealthText.setText(disk > 80 ? 'Status: WATCH' : 'Status: HEALTHY');
+    this.storageHealthText.setColor(disk > 80 ? '#f9c74f' : '#7ef7d6');
   }
 }
 

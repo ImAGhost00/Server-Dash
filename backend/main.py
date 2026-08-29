@@ -5,7 +5,10 @@ from typing import Set
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from collectors.system import collect_system_metrics
+try:
+    from backend.collectors.system import collect_system_metrics
+except ModuleNotFoundError:  # pragma: no cover - fallback for local run from backend directory
+    from collectors.system import collect_system_metrics
 
 app = FastAPI(title="Spaceship Station Backend", version="0.1.0")
 
@@ -22,6 +25,8 @@ current_metrics = {
     "cpu_percent": 0.0,
     "ram_percent": 0.0,
     "disk_percent": 0.0,
+    "disk_used_gb": 0.0,
+    "disk_free_gb": 0.0,
     "timestamp": 0,
 }
 

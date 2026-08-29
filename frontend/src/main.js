@@ -1,25 +1,17 @@
 import ShipScene from './scenes/ShipScene.js';
 
-const gameContainer = document.getElementById('game-shell');
-
+// Fixed logical resolution keeps the hull layout consistent; FIT scales it to the container.
 const config = {
   type: Phaser.AUTO,
   parent: 'game-shell',
-  width: gameContainer.clientWidth,
-  height: gameContainer.clientHeight,
-  backgroundColor: '#050b11',
+  width: 1600,
+  height: 900,
+  backgroundColor: '#0b0414',
   scene: [ShipScene],
   scale: {
-    mode: Phaser.Scale.RESIZE,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
 };
 
-const game = new Phaser.Game(config);
-
-window.addEventListener('resize', () => {
-  if (game && game.scale) {
-    const container = document.getElementById('game-shell');
-    game.scale.resize(container.clientWidth, container.clientHeight);
-  }
-});
+new Phaser.Game(config);
