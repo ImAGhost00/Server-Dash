@@ -8,8 +8,10 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
+    from backend.collectors.health import collect_drive_health
     from backend.collectors.system import collect_media_pool_breakdown, collect_system_metrics
 except ModuleNotFoundError:  # pragma: no cover - fallback for local run from backend directory
+    from collectors.health import collect_drive_health
     from collectors.system import collect_media_pool_breakdown, collect_system_metrics
 
 app = FastAPI(title="Spaceship Station Backend", version="0.1.0")
@@ -24,6 +26,8 @@ app.add_middleware(
 
 MEDIA_POOL_PATH = os.environ.get("MEDIA_POOL_PATH", "/mnt/mediapool")
 MEDIA_BREAKDOWN_CACHE_SECONDS = 300
+DRIVE_DEVICE = os.environ.get("DRIVE_DEVICE", "/dev/sda")
+DRIVE_HEALTH_CACHE_SECONDS = 60
 
 connected_clients: Set[WebSocket] = set()
 current_metrics = {
@@ -41,6 +45,7 @@ current_metrics = {
     "timestamp": 0,
 }
 _media_breakdown_cache = {"data": None, "expires_at": 0.0}
+_drive_health_cache = {"data": None, "expires_at": 0.0}
 
 
 @app.get("/health")
@@ -58,6 +63,18 @@ async def media_pool_breakdown() -> dict:
     _media_breakdown_cache["data"] = breakdown
     _media_breakdown_cache["expires_at"] = now + MEDIA_BREAKDOWN_CACHE_SECONDS
     return breakdown
+
+
+@app.get("/drive/health")
+async def drive_health() -> dict:
+    now = time.time()
+    if _drive_health_cache["data"] is not None and now < _drive_health_cache["expires_at"]:
+        return _drive_health_cache["data"]
+
+    health = collect_drive_health(DRIVE_DEVICE)
+    _drive_health_cache["data"] = health
+    _drive_health_cache["expires_at"] = now + DRIVE_HEALTH_CACHE_SECONDS
+    return health
 
 
 @app.websocket("/ws")

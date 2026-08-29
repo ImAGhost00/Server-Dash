@@ -11,8 +11,15 @@ services:
     restart: unless-stopped
     environment:
       - MEDIA_POOL_PATH=/mnt/mediapool
+      # Run `lsblk` on the Ubuntu host to confirm the real device name (e.g. /dev/sda, /dev/nvme0n1).
+      - DRIVE_DEVICE=/dev/sda
     volumes:
       - /media/MediaPool:/mnt/mediapool:ro
+    devices:
+      - /dev/sda:/dev/sda
+    cap_add:
+      - SYS_RAWIO
+      - SYS_ADMIN
     labels:
       - "org.opencontainers.image.source=https://github.com/ImAGhost00/Server-Dash"
     healthcheck:
