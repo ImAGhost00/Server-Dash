@@ -32,9 +32,11 @@ current_metrics = {
     "disk_percent": 0.0,
     "disk_used_gb": 0.0,
     "disk_total_gb": 0.0,
+    "disk_free_gb": 0.0,
     "media_percent": 0.0,
     "media_used_gb": 0.0,
     "media_total_gb": 0.0,
+    "media_free_gb": 0.0,
     "media_available": False,
     "timestamp": 0,
 }

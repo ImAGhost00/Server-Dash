@@ -9,12 +9,13 @@ def _disk_stats(path: str) -> Dict[str, float]:
     try:
         usage = psutil.disk_usage(path)
     except OSError:
-        return {"percent": 0.0, "used_gb": 0.0, "total_gb": 0.0, "available": False}
+        return {"percent": 0.0, "used_gb": 0.0, "total_gb": 0.0, "free_gb": 0.0, "available": False}
 
     return {
         "percent": round(float(usage.percent), 1),
         "used_gb": round(float(usage.used / (1024 ** 3)), 1),
         "total_gb": round(float(usage.total / (1024 ** 3)), 1),
+        "free_gb": round(float(usage.free / (1024 ** 3)), 1),
         "available": True,
     }
 
@@ -31,9 +32,11 @@ def collect_system_metrics(media_pool_path: str) -> Dict[str, float]:
         "disk_percent": root_disk["percent"],
         "disk_used_gb": root_disk["used_gb"],
         "disk_total_gb": root_disk["total_gb"],
+        "disk_free_gb": root_disk["free_gb"],
         "media_percent": media_disk["percent"],
         "media_used_gb": media_disk["used_gb"],
         "media_total_gb": media_disk["total_gb"],
+        "media_free_gb": media_disk["free_gb"],
         "media_available": media_disk["available"],
         "timestamp": time.time(),
     }

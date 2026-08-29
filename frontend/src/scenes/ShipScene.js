@@ -31,9 +31,8 @@ class ShipScene extends Phaser.Scene {
 
     this.wsUrl = `${socketProtocol}://${socketHost}/ws`;
     this.roomRegistry = [
-      { id: 'engine', name: 'Engine Room', x: 0.16, y: 0.45, width: 0.26, height: 0.48 },
-      { id: 'storage', name: 'Storage Room', x: 0.5, y: 0.45, width: 0.24, height: 0.48 },
-      { id: 'mediapool', name: 'Media Pool', x: 0.82, y: 0.45, width: 0.24, height: 0.48 },
+      { id: 'engine', name: 'Engine Room', x: 0.2, y: 0.46, width: 0.28, height: 0.5 },
+      { id: 'storage', name: 'Storage Bay', x: 0.64, y: 0.46, width: 0.56, height: 0.5 },
     ];
     this.metrics = {
       cpu_percent: 0,
@@ -41,9 +40,11 @@ class ShipScene extends Phaser.Scene {
       disk_percent: 0,
       disk_used_gb: 0,
       disk_total_gb: 0,
+      disk_free_gb: 0,
       media_percent: 0,
       media_used_gb: 0,
       media_total_gb: 0,
+      media_free_gb: 0,
       media_available: false,
     };
     this.socket = null;
@@ -85,7 +86,6 @@ class ShipScene extends Phaser.Scene {
       fontFamily: 'monospace',
       fontSize: '30px',
       color: '#e6d9ff',
-      letterSpacing: '0.24em',
     }).setOrigin(0.5);
 
     const grid = this.add.graphics();
@@ -113,45 +113,44 @@ class ShipScene extends Phaser.Scene {
         fontFamily: 'monospace',
         fontSize: '12px',
         color: '#f3ebff',
-        letterSpacing: '0.12em',
         backgroundColor: 'rgba(15, 10, 22, 0.85)',
         padding: { x: 8, y: 4 },
       }).setOrigin(0.5).setVisible(false);
 
-      room.background.setInteractive({ useHandCursor: true });
-      room.background.on('pointerover', () => {
-        room.label.setVisible(true);
-        room.background.setStrokeStyle(2, PALETTE.accentBright, 1);
-      });
-      room.background.on('pointerout', () => {
-        room.label.setVisible(false);
-        room.background.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
-      });
-
       if (config.id === 'engine') {
-        room.coreGlow = this.add.circle(room.x, room.y - 80, 48, PALETTE.accent, 0.18);
-        room.core = this.add.circle(room.x, room.y - 80, 26, PALETTE.accent, 0.9);
+        room.background.setInteractive({ useHandCursor: true });
+        room.background.on('pointerover', () => {
+          room.label.setVisible(true);
+          room.background.setStrokeStyle(2, PALETTE.accentBright, 1);
+        });
+        room.background.on('pointerout', () => {
+          room.label.setVisible(false);
+          room.background.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
+        });
+
+        room.coreGlow = this.add.circle(room.x, room.y - 90, 48, PALETTE.accent, 0.18);
+        room.core = this.add.circle(room.x, room.y - 90, 26, PALETTE.accent, 0.9);
         room.core.setStrokeStyle(2, PALETTE.accentBright, 1);
 
-        room.cpuLabel = this.add.text(room.x - 82, room.y + 10, 'CPU 0%', {
+        room.cpuLabel = this.add.text(room.x - 82, room.y + 20, 'CPU 0%', {
           fontFamily: 'monospace',
           fontSize: '15px',
           color: '#d4bbff',
         }).setOrigin(0.5);
 
-        room.ramLabel = this.add.text(room.x + 82, room.y + 10, 'RAM 0%', {
+        room.ramLabel = this.add.text(room.x + 82, room.y + 20, 'RAM 0%', {
           fontFamily: 'monospace',
           fontSize: '15px',
           color: '#d4bbff',
         }).setOrigin(0.5);
 
-        room.cpuGauge = this.add.rectangle(room.x - 82, room.y + 36, 120, 10, PALETTE.gaugeTrack, 1)
+        room.cpuGauge = this.add.rectangle(room.x - 82, room.y + 46, 120, 10, PALETTE.gaugeTrack, 1)
           .setStrokeStyle(1, PALETTE.panelStroke, 0.7);
-        room.cpuGaugeFill = this.add.rectangle(room.x - 142, room.y + 36, 0, 8, PALETTE.accent, 1).setOrigin(0, 0.5);
+        room.cpuGaugeFill = this.add.rectangle(room.x - 142, room.y + 46, 0, 8, PALETTE.accent, 1).setOrigin(0, 0.5);
 
-        room.ramGauge = this.add.rectangle(room.x + 82, room.y + 36, 120, 10, PALETTE.gaugeTrack, 1)
+        room.ramGauge = this.add.rectangle(room.x + 82, room.y + 46, 120, 10, PALETTE.gaugeTrack, 1)
           .setStrokeStyle(1, PALETTE.panelStroke, 0.7);
-        room.ramGaugeFill = this.add.rectangle(room.x + 22, room.y + 36, 0, 8, PALETTE.accent, 1).setOrigin(0, 0.5);
+        room.ramGaugeFill = this.add.rectangle(room.x + 22, room.y + 46, 0, 8, PALETTE.accent, 1).setOrigin(0, 0.5);
 
         room.pulse = this.tweens.add({
           targets: [room.coreGlow],
@@ -164,84 +163,105 @@ class ShipScene extends Phaser.Scene {
       }
 
       if (config.id === 'storage') {
-        room.usedLabel = this.add.text(room.x - 58, room.y - 12, 'USED', {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#bfa9db',
-          letterSpacing: '0.12em',
-        }).setOrigin(0.5);
-
-        room.usedValue = this.add.text(room.x - 58, room.y + 16, '0 GB', {
-          fontFamily: 'monospace',
-          fontSize: '22px',
-          color: '#e6d9ff',
-        }).setOrigin(0.5);
-
-        room.totalLabel = this.add.text(room.x + 58, room.y - 12, 'TOTAL', {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#bfa9db',
-          letterSpacing: '0.12em',
-        }).setOrigin(0.5);
-
-        room.totalValue = this.add.text(room.x + 58, room.y + 16, '0 GB', {
-          fontFamily: 'monospace',
-          fontSize: '22px',
-          color: '#e6d9ff',
-        }).setOrigin(0.5);
-
-        room.status = this.add.text(room.x, room.y + 62, 'CLICK TO INSPECT', {
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#7ef7d6',
-          letterSpacing: '0.12em',
-        }).setOrigin(0.5);
-
-        room.background.setInteractive({ useHandCursor: true });
-        room.background.on('pointerdown', () => this.toggleStorageWindow(room));
-      }
-
-      if (config.id === 'mediapool') {
-        room.usedLabel = this.add.text(room.x - 58, room.y - 12, 'USED', {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#bfa9db',
-          letterSpacing: '0.12em',
-        }).setOrigin(0.5);
-
-        room.usedValue = this.add.text(room.x - 58, room.y + 16, '0 GB', {
-          fontFamily: 'monospace',
-          fontSize: '20px',
-          color: '#e6d9ff',
-        }).setOrigin(0.5);
-
-        room.totalLabel = this.add.text(room.x + 58, room.y - 12, 'TOTAL', {
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          color: '#bfa9db',
-          letterSpacing: '0.12em',
-        }).setOrigin(0.5);
-
-        room.totalValue = this.add.text(room.x + 58, room.y + 16, '0 GB', {
-          fontFamily: 'monospace',
-          fontSize: '20px',
-          color: '#e6d9ff',
-        }).setOrigin(0.5);
-
-        room.status = this.add.text(room.x, room.y + 62, 'CLICK TO INSPECT', {
-          fontFamily: 'monospace',
-          fontSize: '11px',
-          color: '#7ef7d6',
-          letterSpacing: '0.12em',
-        }).setOrigin(0.5);
-
-        room.background.setInteractive({ useHandCursor: true });
-        room.background.on('pointerdown', () => this.toggleMediaWindow(room));
+        this.createStorageBay(room);
       }
     });
 
     this.createStorageWindow();
     this.createMediaWindow();
+  }
+
+  createStorageBay(room) {
+    const leftX = room.x - room.width / 4;
+    const rightX = room.x + room.width / 4;
+
+    room.divider = this.add.rectangle(room.x, room.y, 2, room.height * 0.84, PALETTE.panelStroke, 0.6);
+
+    room.diskHeader = this.add.text(leftX, room.y - room.height / 2 + 32, 'DISK STORAGE', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#f3ebff',
+    }).setOrigin(0.5);
+
+    room.diskUsedText = this.add.text(leftX, room.y - 34, 'USED   0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#e6d9ff',
+    }).setOrigin(0.5);
+
+    room.diskTotalText = this.add.text(leftX, room.y, 'TOTAL  0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#e6d9ff',
+    }).setOrigin(0.5);
+
+    room.diskFreeText = this.add.text(leftX, room.y + 34, 'FREE   0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#e6d9ff',
+    }).setOrigin(0.5);
+
+    room.diskStatus = this.add.text(leftX, room.y + room.height / 2 - 26, 'CLICK TO INSPECT', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#7ef7d6',
+    }).setOrigin(0.5);
+
+    room.mediaHeader = this.add.text(rightX, room.y - room.height / 2 + 32, 'MEDIA POOL', {
+      fontFamily: 'monospace',
+      fontSize: '13px',
+      color: '#f3ebff',
+    }).setOrigin(0.5);
+
+    room.mediaUsedText = this.add.text(rightX, room.y - 34, 'USED   0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#e6d9ff',
+    }).setOrigin(0.5);
+
+    room.mediaTotalText = this.add.text(rightX, room.y, 'TOTAL  0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#e6d9ff',
+    }).setOrigin(0.5);
+
+    room.mediaFreeText = this.add.text(rightX, room.y + 34, 'FREE   0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      color: '#e6d9ff',
+    }).setOrigin(0.5);
+
+    room.mediaStatus = this.add.text(rightX, room.y + room.height / 2 - 26, 'CLICK TO INSPECT', {
+      fontFamily: 'monospace',
+      fontSize: '11px',
+      color: '#7ef7d6',
+    }).setOrigin(0.5);
+
+    const zoneWidth = room.width / 2;
+    const hoverHandlers = () => ({
+      pointerover: () => {
+        room.label.setVisible(true);
+        room.background.setStrokeStyle(2, PALETTE.accentBright, 1);
+      },
+      pointerout: () => {
+        room.label.setVisible(false);
+        room.background.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
+      },
+    });
+
+    room.diskZone = this.add.rectangle(leftX, room.y, zoneWidth, room.height, 0xffffff, 0)
+      .setInteractive({ useHandCursor: true });
+    const diskHover = hoverHandlers();
+    room.diskZone.on('pointerover', diskHover.pointerover);
+    room.diskZone.on('pointerout', diskHover.pointerout);
+    room.diskZone.on('pointerdown', () => this.toggleStorageWindow(room));
+
+    room.mediaZone = this.add.rectangle(rightX, room.y, zoneWidth, room.height, 0xffffff, 0)
+      .setInteractive({ useHandCursor: true });
+    const mediaHover = hoverHandlers();
+    room.mediaZone.on('pointerover', mediaHover.pointerover);
+    room.mediaZone.on('pointerout', mediaHover.pointerout);
+    room.mediaZone.on('pointerdown', () => this.toggleMediaWindow(room));
   }
 
   createModuleRoom(roomConfig) {
@@ -270,45 +290,49 @@ class ShipScene extends Phaser.Scene {
     this.storageWindow = this.add.container(width * 0.5, height * 0.52);
     this.storageWindow.setVisible(false);
 
-    const backdrop = this.add.rectangle(0, 0, 430, 240, 0x120b1b, 0.96);
+    const backdrop = this.add.rectangle(0, 0, 400, 300, 0x120b1b, 0.96);
     backdrop.setStrokeStyle(2, PALETTE.accent, 0.8);
 
-    const header = this.add.text(0, -82, 'DRIVE HEALTH', {
+    const header = this.add.text(0, -110, 'DRIVE HEALTH', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#f3ebff',
-      letterSpacing: '0.12em',
     }).setOrigin(0.5);
 
-    const usedText = this.add.text(-140, -12, 'Used: 0 GB', {
+    const usedText = this.add.text(0, -60, 'Used: 0 GB', {
       fontFamily: 'monospace',
-      fontSize: '18px',
+      fontSize: '17px',
       color: '#e6d9ff',
-    });
+    }).setOrigin(0.5);
 
-    const totalText = this.add.text(80, -12, 'Total: 0 GB', {
+    const totalText = this.add.text(0, -28, 'Total: 0 GB', {
       fontFamily: 'monospace',
-      fontSize: '18px',
+      fontSize: '17px',
       color: '#e6d9ff',
-    });
+    }).setOrigin(0.5);
 
-    const healthText = this.add.text(0, 40, 'Status: HEALTHY', {
+    const freeText = this.add.text(0, 4, 'Free: 0 GB', {
+      fontFamily: 'monospace',
+      fontSize: '17px',
+      color: '#e6d9ff',
+    }).setOrigin(0.5);
+
+    const healthText = this.add.text(0, 44, 'Status: HEALTHY', {
       fontFamily: 'monospace',
       fontSize: '16px',
       color: '#7ef7d6',
-      letterSpacing: '0.08em',
     }).setOrigin(0.5);
 
-    const hintText = this.add.text(0, 78, 'click the room again to close', {
+    const hintText = this.add.text(0, 118, 'click the room again to close', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#bfa9db',
-      letterSpacing: '0.08em',
     }).setOrigin(0.5);
 
-    this.storageWindow.add([backdrop, header, usedText, totalText, healthText, hintText]);
+    this.storageWindow.add([backdrop, header, usedText, totalText, freeText, healthText, hintText]);
     this.storageUsedText = usedText;
     this.storageTotalText = totalText;
+    this.storageFreeText = freeText;
     this.storageHealthText = healthText;
   }
 
@@ -330,34 +354,34 @@ class ShipScene extends Phaser.Scene {
     this.mediaWindow = this.add.container(width * 0.5, height * 0.52);
     this.mediaWindow.setVisible(false);
 
-    const backdrop = this.add.rectangle(0, 0, 460, 320, 0x120b1b, 0.96);
+    const backdrop = this.add.rectangle(0, 0, 460, 340, 0x120b1b, 0.96);
     backdrop.setStrokeStyle(2, PALETTE.accent, 0.8);
 
-    const header = this.add.text(0, -140, 'MEDIA POOL BREAKDOWN', {
+    const header = this.add.text(0, -150, 'MEDIA POOL BREAKDOWN', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#f3ebff',
-      letterSpacing: '0.1em',
     }).setOrigin(0.5);
 
-    const summaryText = this.add.text(0, -100, 'Used: 0 GB / Total: 0 GB', {
+    const summaryText = this.add.text(0, -105, 'Used: 0 GB\nTotal: 0 GB  Free: 0 GB', {
       fontFamily: 'monospace',
-      fontSize: '15px',
+      fontSize: '14px',
       color: '#d4bbff',
+      align: 'center',
+      lineSpacing: 6,
     }).setOrigin(0.5);
 
-    const categoryText = this.add.text(-200, -70, 'Loading categories...', {
+    const categoryText = this.add.text(-200, -60, 'Loading categories...', {
       fontFamily: 'monospace',
       fontSize: '14px',
       color: '#e6d9ff',
       lineSpacing: 8,
     });
 
-    const hintText = this.add.text(0, 138, 'click the room again to close', {
+    const hintText = this.add.text(0, 148, 'click the room again to close', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#bfa9db',
-      letterSpacing: '0.08em',
     }).setOrigin(0.5);
 
     this.mediaWindow.add([backdrop, header, summaryText, categoryText, hintText]);
@@ -403,11 +427,13 @@ class ShipScene extends Phaser.Scene {
     const cpu = Math.max(0, Math.min(100, this.metrics.cpu_percent || 0));
     const ram = Math.max(0, Math.min(100, this.metrics.ram_percent || 0));
     const disk = Math.max(0, Math.min(100, this.metrics.disk_percent || 0));
-    const usedGb = Number(this.metrics.disk_used_gb || 0);
-    const totalGb = Number(this.metrics.disk_total_gb || 0);
+    const diskUsed = Number(this.metrics.disk_used_gb || 0);
+    const diskTotal = Number(this.metrics.disk_total_gb || 0);
+    const diskFree = Number(this.metrics.disk_free_gb || 0);
     const mediaPercent = Math.max(0, Math.min(100, this.metrics.media_percent || 0));
-    const mediaUsedGb = Number(this.metrics.media_used_gb || 0);
-    const mediaTotalGb = Number(this.metrics.media_total_gb || 0);
+    const mediaUsed = Number(this.metrics.media_used_gb || 0);
+    const mediaTotal = Number(this.metrics.media_total_gb || 0);
+    const mediaFree = Number(this.metrics.media_free_gb || 0);
     const mediaAvailable = Boolean(this.metrics.media_available);
     const warning = cpu > 80;
 
@@ -436,29 +462,34 @@ class ShipScene extends Phaser.Scene {
     });
 
     const storageRoom = this.roomMap.get('storage');
-    storageRoom.usedValue.setText(formatStorageValue(usedGb));
-    storageRoom.totalValue.setText(formatStorageValue(totalGb));
-    storageRoom.status.setText(disk > 80 ? 'DRIVE NEAR LIMIT' : 'CLICK TO INSPECT');
-    storageRoom.status.setColor(disk > 80 ? '#f9c74f' : '#7ef7d6');
+    storageRoom.diskUsedText.setText(`USED   ${formatStorageValue(diskUsed)}`);
+    storageRoom.diskTotalText.setText(`TOTAL  ${formatStorageValue(diskTotal)}`);
+    storageRoom.diskFreeText.setText(`FREE   ${formatStorageValue(diskFree)}`);
+    storageRoom.diskStatus.setText(disk > 80 ? 'DRIVE NEAR LIMIT' : 'CLICK TO INSPECT');
+    storageRoom.diskStatus.setColor(disk > 80 ? '#f9c74f' : '#7ef7d6');
 
-    this.storageUsedText.setText(`Used: ${formatStorageValue(usedGb)}`);
-    this.storageTotalText.setText(`Total: ${formatStorageValue(totalGb)}`);
+    if (mediaAvailable) {
+      storageRoom.mediaUsedText.setText(`USED   ${formatStorageValue(mediaUsed)}`);
+      storageRoom.mediaTotalText.setText(`TOTAL  ${formatStorageValue(mediaTotal)}`);
+      storageRoom.mediaFreeText.setText(`FREE   ${formatStorageValue(mediaFree)}`);
+      storageRoom.mediaStatus.setText(mediaPercent > 90 ? 'POOL NEAR LIMIT' : 'CLICK TO INSPECT');
+      storageRoom.mediaStatus.setColor(mediaPercent > 90 ? '#f9c74f' : '#7ef7d6');
+    } else {
+      storageRoom.mediaUsedText.setText('USED   N/A');
+      storageRoom.mediaTotalText.setText('TOTAL  N/A');
+      storageRoom.mediaFreeText.setText('FREE   N/A');
+      storageRoom.mediaStatus.setText('NOT MOUNTED');
+      storageRoom.mediaStatus.setColor('#ff6b6b');
+    }
+
+    this.storageUsedText.setText(`Used: ${formatStorageValue(diskUsed)}`);
+    this.storageTotalText.setText(`Total: ${formatStorageValue(diskTotal)}`);
+    this.storageFreeText.setText(`Free: ${formatStorageValue(diskFree)}`);
     this.storageHealthText.setText(disk > 80 ? 'Status: WATCH' : 'Status: HEALTHY');
     this.storageHealthText.setColor(disk > 80 ? '#f9c74f' : '#7ef7d6');
 
-    const mediaRoom = this.roomMap.get('mediapool');
-    mediaRoom.usedValue.setText(mediaAvailable ? formatStorageValue(mediaUsedGb) : 'N/A');
-    mediaRoom.totalValue.setText(mediaAvailable ? formatStorageValue(mediaTotalGb) : 'N/A');
-    if (!mediaAvailable) {
-      mediaRoom.status.setText('NOT MOUNTED');
-      mediaRoom.status.setColor('#ff6b6b');
-    } else {
-      mediaRoom.status.setText(mediaPercent > 90 ? 'POOL NEAR LIMIT' : 'CLICK TO INSPECT');
-      mediaRoom.status.setColor(mediaPercent > 90 ? '#f9c74f' : '#7ef7d6');
-    }
-
     this.mediaSummaryText.setText(mediaAvailable
-      ? `Used: ${formatStorageValue(mediaUsedGb)} / Total: ${formatStorageValue(mediaTotalGb)}`
+      ? `Used: ${formatStorageValue(mediaUsed)}\nTotal: ${formatStorageValue(mediaTotal)}  Free: ${formatStorageValue(mediaFree)}`
       : 'Media pool volume not mounted');
   }
 }
