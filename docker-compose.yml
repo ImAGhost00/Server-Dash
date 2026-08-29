@@ -1,3 +1,6 @@
+# GitHub repository for Portainer / stack metadata
+# Source: https://github.com/ImAGhost00/Server-Dash
+
 services:
   backend:
     build:
@@ -6,6 +9,8 @@ services:
     ports:
       - "8000:8000"
     restart: unless-stopped
+    labels:
+      - "org.opencontainers.image.source=https://github.com/ImAGhost00/Server-Dash"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
       interval: 10s
@@ -21,3 +26,5 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    labels:
+      - "org.opencontainers.image.source=https://github.com/ImAGhost00/Server-Dash"
