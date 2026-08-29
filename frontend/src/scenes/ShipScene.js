@@ -16,9 +16,10 @@ class ShipScene extends Phaser.Scene {
   constructor() {
     super('ShipScene');
 
-    const socketHost = window.location.port === '8802'
-      ? 'localhost:8801'
-      : window.location.host;
+    // Same-origin by default so it works through the Nginx /ws proxy on the real server;
+    // ?backend=host:port lets you point at a different backend during local dev only.
+    const backendOverride = new URLSearchParams(window.location.search).get('backend');
+    const socketHost = backendOverride || window.location.host;
     const socketProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 
     this.wsUrl = `${socketProtocol}://${socketHost}/ws`;
