@@ -1,19 +1,19 @@
 const PALETTE = {
-  bg: 0x070b12,
-  panelFill: 0x111c28,
-  panelStroke: 0x74a2c9,
-  titleBarFill: 0x1d3247,
-  gridLine: 0x5f89ac,
-  accent: 0x82d9ff,
-  accentBright: 0xd4f5ff,
-  gaugeTrack: 0x223547,
-  good: 0x7ef7d6,
+  bg: 0x120d09,
+  panelFill: 0x2a1c14,
+  panelStroke: 0xa88757,
+  titleBarFill: 0x49311f,
+  gridLine: 0x8c6a3f,
+  accent: 0xe2b56d,
+  accentBright: 0xffe2ac,
+  gaugeTrack: 0x3b281c,
+  good: 0x8ccf7a,
   warning: 0xf9c74f,
   danger: 0xff6b6b,
-  offline: 0x2a3440,
+  offline: 0x31261f,
 };
 
-const STAR_COLORS = [0x9ec8ff, 0xb9ddff, 0x8ab6eb, 0xc8e8ff];
+const STAR_COLORS = [0xc9a674, 0xd6b989, 0xb89361, 0xe0c9a0];
 
 function formatStorageValue(gb) {
   if (gb >= 1024) {
@@ -27,9 +27,9 @@ function levelColor(level) {
     return '#ff6b6b';
   }
   if (level === 'warn') {
-    return '#f9c74f';
+    return '#f2bd69';
   }
-  return '#9be8ff';
+  return '#e9d1a6';
 }
 
 class ShipScene extends Phaser.Scene {
@@ -42,9 +42,9 @@ class ShipScene extends Phaser.Scene {
 
     this.wsUrl = `${socketProtocol}://${socketHost}/ws`;
     this.roomRegistry = [
-      { id: 'helm', name: 'Helm', x: 0.5, y: 0.25, width: 0.5, height: 0.24 },
-      { id: 'engine', name: 'Engine Room', x: 0.28, y: 0.6, width: 0.36, height: 0.46 },
-      { id: 'storage', name: 'Storage Bay', x: 0.71, y: 0.6, width: 0.42, height: 0.46 },
+      { id: 'helm', name: 'War Table', x: 0.5, y: 0.25, width: 0.5, height: 0.24 },
+      { id: 'engine', name: 'Forge', x: 0.28, y: 0.6, width: 0.36, height: 0.46 },
+      { id: 'storage', name: 'Granary', x: 0.71, y: 0.6, width: 0.42, height: 0.46 },
     ];
 
     this.metrics = {
@@ -83,7 +83,7 @@ class ShipScene extends Phaser.Scene {
     };
 
     this.starDots = [];
-    this.ambientDrones = [];
+    this.colonistPawns = [];
   }
 
   create() {
@@ -92,7 +92,7 @@ class ShipScene extends Phaser.Scene {
     this.createStarfield();
     this.createStationFrame();
     this.createRoomModules();
-    this.createAmbientDrones();
+    this.createColonistPawns();
     this.startHelmMockTicker();
 
     this.connectSocket();
@@ -103,14 +103,14 @@ class ShipScene extends Phaser.Scene {
       callback: () => this.monitorTelemetryHeartbeat(),
     });
 
-    this.addHelmEvent('info', 'helm', 'Boot sequence complete (MOCK)');
-    this.addHelmEvent('info', 'engine', 'Waiting for telemetry link');
+    this.addHelmEvent('info', 'helm', 'Castle watch online (MOCK)');
+    this.addHelmEvent('info', 'engine', 'Forge stewards await telemetry link');
     this.applyRoomPower(false);
   }
 
   update(time, delta) {
     this.updateStarfield(delta);
-    this.updateAmbientDrones(delta);
+    this.updateColonistPawns(delta);
   }
 
   connectSocket() {
@@ -122,7 +122,7 @@ class ShipScene extends Phaser.Scene {
       this.connectionState.lastMessageAt = Date.now();
       this.applyRoomPower(true);
       if (wasOffline) {
-        this.addHelmEvent('info', 'helm', 'Telemetry uplink restored');
+        this.addHelmEvent('info', 'helm', 'Messenger uplink restored');
       }
     });
 
@@ -138,7 +138,7 @@ class ShipScene extends Phaser.Scene {
         }
       } catch (error) {
         console.error('Invalid websocket payload', error);
-        this.addHelmEvent('warn', 'helm', 'Malformed telemetry payload dropped');
+        this.addHelmEvent('warn', 'helm', 'Malformed raven report discarded');
       }
     });
 
@@ -147,7 +147,7 @@ class ShipScene extends Phaser.Scene {
       this.connectionState.online = false;
       this.applyRoomPower(false);
       if (hadLink) {
-        this.addHelmEvent('warn', 'helm', 'Telemetry uplink lost');
+        this.addHelmEvent('warn', 'helm', 'Messenger uplink lost');
       }
       setTimeout(() => this.connectSocket(), 2000);
     });
@@ -161,7 +161,7 @@ class ShipScene extends Phaser.Scene {
     if (Date.now() - this.connectionState.lastMessageAt > 7000) {
       this.connectionState.online = false;
       this.applyRoomPower(false);
-      this.addHelmEvent('warn', 'helm', 'Telemetry timed out; rooms in safe mode');
+      this.addHelmEvent('warn', 'helm', 'Telemetry timed out; keep in torchlight mode');
     }
   }
 
@@ -175,7 +175,7 @@ class ShipScene extends Phaser.Scene {
       const radius = Phaser.Math.FloatBetween(0.7, 2.2);
       const alpha = Phaser.Math.FloatBetween(0.2, 0.9);
       const dot = this.add.circle(x, y, radius, Phaser.Utils.Array.GetRandom(STAR_COLORS), alpha);
-      dot.starSpeed = Phaser.Math.FloatBetween(8, 52);
+      dot.starSpeed = Phaser.Math.FloatBetween(4, 26);
       dot.parallaxScale = Phaser.Math.FloatBetween(0.85, 1.25);
       this.starLayer.add(dot);
       this.starDots.push(dot);
@@ -199,16 +199,16 @@ class ShipScene extends Phaser.Scene {
   createStationFrame() {
     const { width, height } = this.scale;
 
-    this.add.text(width * 0.5, height * 0.07, 'COLONY COMMAND DECK', {
+    this.add.text(width * 0.5, height * 0.07, 'KINGDOM COMMAND TABLE', {
       fontFamily: 'monospace',
       fontSize: '30px',
-      color: '#d7efff',
+      color: '#f2ddba',
     }).setOrigin(0.5);
 
-    this.add.text(width * 0.5, height * 0.106, 'RIMWORLD STYLE HARDWARE OVERWATCH', {
+    this.add.text(width * 0.5, height * 0.106, 'RIMWORLD STYLE KEEP OVERWATCH', {
       fontFamily: 'monospace',
       fontSize: '12px',
-      color: '#86b9de',
+      color: '#cba779',
     }).setOrigin(0.5);
 
     const hull = this.add.graphics();
@@ -227,7 +227,7 @@ class ShipScene extends Phaser.Scene {
     }
 
     const corridor = this.add.graphics();
-    corridor.fillStyle(0x112131, 0.7);
+    corridor.fillStyle(0x3a281b, 0.7);
     corridor.fillRoundedRect(width * 0.43, height * 0.37, width * 0.14, height * 0.18, 16);
     corridor.lineStyle(1, PALETTE.panelStroke, 0.4);
     corridor.strokeRoundedRect(width * 0.43, height * 0.37, width * 0.14, height * 0.18, 16);
@@ -243,8 +243,8 @@ class ShipScene extends Phaser.Scene {
       room.label = this.add.text(room.x, room.y - room.height / 2 - 24, config.name.toUpperCase(), {
         fontFamily: 'monospace',
         fontSize: '12px',
-        color: '#e7f6ff',
-        backgroundColor: 'rgba(8, 17, 28, 0.92)',
+        color: '#f7e4c4',
+        backgroundColor: 'rgba(48, 32, 20, 0.92)',
         padding: { x: 8, y: 4 },
       }).setOrigin(0.5).setVisible(false);
 
@@ -287,13 +287,13 @@ class ShipScene extends Phaser.Scene {
     room.cpuLabel = this.add.text(room.x - 82, room.y + 14, 'CPU OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#d4bbff',
+      color: '#f2ddb3',
     }).setOrigin(0.5);
 
     room.ramLabel = this.add.text(room.x + 82, room.y + 14, 'RAM OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#d4bbff',
+      color: '#f2ddb3',
     }).setOrigin(0.5);
 
     room.cpuGauge = this.add.rectangle(room.x - 82, room.y + 42, 120, 10, PALETTE.gaugeTrack, 1)
@@ -318,36 +318,36 @@ class ShipScene extends Phaser.Scene {
     room.statusLamp = this.add.circle(room.x - room.width / 2 + 24, room.y - room.height / 2 + 22, 6, PALETTE.danger, 0.9)
       .setStrokeStyle(1, PALETTE.panelStroke, 0.7);
 
-    room.connectionText = this.add.text(room.x - room.width / 2 + 38, room.y - room.height / 2 + 22, 'UPLINK OFFLINE', {
+    room.connectionText = this.add.text(room.x - room.width / 2 + 38, room.y - room.height / 2 + 22, 'SCOUTS OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '12px',
-      color: '#ff9d9d',
+      color: '#ffc4a1',
     }).setOrigin(0, 0.5);
 
-    room.mockTag = this.add.text(room.x + room.width / 2 - 10, room.y - room.height / 2 + 22, 'MOCK BUS', {
+    room.mockTag = this.add.text(room.x + room.width / 2 - 10, room.y - room.height / 2 + 22, 'MOCK SCROLL', {
       fontFamily: 'monospace',
       fontSize: '11px',
-      color: '#f9c74f',
-      backgroundColor: '#2f2310',
+      color: '#f2bd69',
+      backgroundColor: '#3f2a16',
       padding: { x: 6, y: 3 },
     }).setOrigin(1, 0.5);
 
-    room.relayText = this.add.text(room.x - room.width / 2 + 20, room.y - room.height / 2 + 50, 'MOCK RELAY LOAD 0%', {
+    room.relayText = this.add.text(room.x - room.width / 2 + 20, room.y - room.height / 2 + 50, 'MOCK SCOUT LOAD 0%', {
       fontFamily: 'monospace',
       fontSize: '13px',
-      color: '#c9ecff',
+      color: '#e9d1a6',
     }).setOrigin(0, 0.5);
 
-    room.pingText = this.add.text(room.x - room.width / 2 + 20, room.y - room.height / 2 + 74, 'MOCK RTT 0 ms', {
+    room.pingText = this.add.text(room.x - room.width / 2 + 20, room.y - room.height / 2 + 74, 'MOCK RIDER RTT 0 ms', {
       fontFamily: 'monospace',
       fontSize: '13px',
-      color: '#c9ecff',
+      color: '#e9d1a6',
     }).setOrigin(0, 0.5);
 
-    room.feedTitle = this.add.text(room.x - room.width / 2 + 20, room.y - room.height / 2 + 104, 'HELM NOTIFICATIONS', {
+    room.feedTitle = this.add.text(room.x - room.width / 2 + 20, room.y - room.height / 2 + 104, 'WAR TABLE NOTICES', {
       fontFamily: 'monospace',
       fontSize: '12px',
-      color: '#d7efff',
+      color: '#f2ddba',
     }).setOrigin(0, 0.5);
 
     room.feedLines = [];
@@ -355,7 +355,7 @@ class ShipScene extends Phaser.Scene {
       const line = this.add.text(room.x - room.width / 2 + 20, room.y - room.height / 2 + 126 + i * 18, '-', {
         fontFamily: 'monospace',
         fontSize: '11px',
-        color: '#9be8ff',
+        color: '#e9d1a6',
       }).setOrigin(0, 0.5);
       room.feedLines.push(line);
     }
@@ -370,28 +370,28 @@ class ShipScene extends Phaser.Scene {
     room.diskHeader = this.add.text(leftX, room.y - room.height / 2 + 32, 'DISK STORAGE', {
       fontFamily: 'monospace',
       fontSize: '13px',
-      color: '#f3ebff',
+      color: '#f7e5c4',
     }).setOrigin(0.5);
 
     room.diskUsedText = this.add.text(leftX, room.y - 34, 'USED   OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#e6d9ff',
+      color: '#f7dfba',
     }).setOrigin(0.5);
 
     room.diskTotalText = this.add.text(leftX, room.y, 'TOTAL  OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#e6d9ff',
+      color: '#f7dfba',
     }).setOrigin(0.5);
 
     room.diskFreeText = this.add.text(leftX, room.y + 34, 'FREE   OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#e6d9ff',
+      color: '#f7dfba',
     }).setOrigin(0.5);
 
-    room.diskStatus = this.add.text(leftX, room.y + room.height / 2 - 26, 'OFFLINE', {
+    room.diskStatus = this.add.text(leftX, room.y + room.height / 2 - 26, 'HEARTH COLD', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#ff6b6b',
@@ -400,28 +400,28 @@ class ShipScene extends Phaser.Scene {
     room.mediaHeader = this.add.text(rightX, room.y - room.height / 2 + 32, 'MEDIA POOL', {
       fontFamily: 'monospace',
       fontSize: '13px',
-      color: '#f3ebff',
+      color: '#f7e5c4',
     }).setOrigin(0.5);
 
     room.mediaUsedText = this.add.text(rightX, room.y - 34, 'USED   OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#e6d9ff',
+      color: '#f7dfba',
     }).setOrigin(0.5);
 
     room.mediaTotalText = this.add.text(rightX, room.y, 'TOTAL  OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#e6d9ff',
+      color: '#f7dfba',
     }).setOrigin(0.5);
 
     room.mediaFreeText = this.add.text(rightX, room.y + 34, 'FREE   OFFLINE', {
       fontFamily: 'monospace',
       fontSize: '15px',
-      color: '#e6d9ff',
+      color: '#f7dfba',
     }).setOrigin(0.5);
 
-    room.mediaStatus = this.add.text(rightX, room.y + room.height / 2 - 26, 'OFFLINE', {
+    room.mediaStatus = this.add.text(rightX, room.y + room.height / 2 - 26, 'HEARTH COLD', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#ff6b6b',
@@ -450,7 +450,7 @@ class ShipScene extends Phaser.Scene {
     room.diskZone.on('pointerout', diskHover.pointerout);
     room.diskZone.on('pointerdown', () => {
       if (!room.isOnline) {
-        this.addHelmEvent('warn', 'storage', 'Storage controls locked while offline');
+        this.addHelmEvent('warn', 'storage', 'Granary controls locked while dark');
         return;
       }
       this.toggleStorageWindow(room);
@@ -463,7 +463,7 @@ class ShipScene extends Phaser.Scene {
     room.mediaZone.on('pointerout', mediaHover.pointerout);
     room.mediaZone.on('pointerdown', () => {
       if (!room.isOnline) {
-        this.addHelmEvent('warn', 'storage', 'Media controls locked while offline');
+        this.addHelmEvent('warn', 'storage', 'Storehouse controls locked while dark');
         return;
       }
       this.toggleMediaWindow(room);
@@ -495,40 +495,83 @@ class ShipScene extends Phaser.Scene {
     };
   }
 
-  createAmbientDrones() {
+  createColonistPawns() {
     const { width, height } = this.scale;
-    for (let i = 0; i < 9; i += 1) {
-      const dot = this.add.circle(
+    const roomIds = this.roomRegistry.map((room) => room.id);
+    for (let i = 0; i < 8; i += 1) {
+      const pawn = this.add.circle(
         Phaser.Math.Between(width * 0.12, width * 0.88),
         Phaser.Math.Between(height * 0.19, height * 0.85),
-        Phaser.Math.FloatBetween(1.4, 2.6),
-        0xaee3ff,
-        Phaser.Math.FloatBetween(0.2, 0.6),
+        Phaser.Math.FloatBetween(2.0, 3.2),
+        Phaser.Math.RND.pick([0xffd07f, 0xeeb96d, 0xd9a763, 0xffe2b0]),
+        Phaser.Math.FloatBetween(0.5, 0.9),
       );
-      dot.vx = Phaser.Math.FloatBetween(-8, 8);
-      dot.vy = Phaser.Math.FloatBetween(-5, 5);
-      dot.setDepth(-1);
-      this.ambientDrones.push(dot);
+      pawn.setDepth(-1);
+      pawn.speed = Phaser.Math.FloatBetween(28, 48);
+      pawn.waitMs = Phaser.Math.Between(250, 1500);
+      pawn.targetRoomId = roomIds[i % roomIds.length];
+      pawn.targetPoint = this.getRoomAnchor(pawn.targetRoomId);
+      this.colonistPawns.push(pawn);
     }
   }
 
-  updateAmbientDrones(delta) {
-    const drift = delta / 1000;
-    const minX = this.scale.width * 0.1;
-    const maxX = this.scale.width * 0.9;
-    const minY = this.scale.height * 0.16;
-    const maxY = this.scale.height * 0.88;
+  getRoomAnchor(roomId) {
+    const room = this.roomMap.get(roomId);
+    if (!room) {
+      return { x: this.scale.width * 0.5, y: this.scale.height * 0.5 };
+    }
 
-    this.ambientDrones.forEach((dot) => {
-      dot.x += dot.vx * drift;
-      dot.y += dot.vy * drift;
+    return {
+      x: Phaser.Math.Between(room.x - room.width * 0.24, room.x + room.width * 0.24),
+      y: Phaser.Math.Between(room.y - room.height * 0.24, room.y + room.height * 0.24),
+    };
+  }
 
-      if (dot.x <= minX || dot.x >= maxX) {
-        dot.vx *= -1;
+  choosePawnTargetRoom() {
+    if (!this.connectionState.online) {
+      return 'helm';
+    }
+
+    if (this.alertFlags.cpuHot || this.alertFlags.ramHot) {
+      return Math.random() > 0.35 ? 'engine' : 'helm';
+    }
+
+    if (this.alertFlags.diskHot) {
+      return Math.random() > 0.35 ? 'storage' : 'helm';
+    }
+
+    return Phaser.Math.RND.pick(['engine', 'storage', 'helm']);
+  }
+
+  updateColonistPawns(delta) {
+    const dt = delta / 1000;
+
+    this.colonistPawns.forEach((pawn) => {
+      if (!pawn.targetPoint) {
+        pawn.targetRoomId = this.choosePawnTargetRoom();
+        pawn.targetPoint = this.getRoomAnchor(pawn.targetRoomId);
       }
-      if (dot.y <= minY || dot.y >= maxY) {
-        dot.vy *= -1;
+
+      if (pawn.waitMs > 0) {
+        pawn.waitMs -= delta;
+        return;
       }
+
+      const dx = pawn.targetPoint.x - pawn.x;
+      const dy = pawn.targetPoint.y - pawn.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < 4) {
+        pawn.waitMs = Phaser.Math.Between(300, 1400);
+        pawn.targetRoomId = this.choosePawnTargetRoom();
+        pawn.targetPoint = this.getRoomAnchor(pawn.targetRoomId);
+        return;
+      }
+
+      const vx = (dx / distance) * pawn.speed * dt;
+      const vy = (dy / distance) * pawn.speed * dt;
+      pawn.x += vx;
+      pawn.y += vy;
     });
   }
 
@@ -545,11 +588,11 @@ class ShipScene extends Phaser.Scene {
         this.mockHelm.relayLoad = Phaser.Math.Clamp(this.mockHelm.relayLoad + Phaser.Math.Between(-8, 9), 8, 97);
         this.mockHelm.pingMs = Phaser.Math.Clamp(this.mockHelm.pingMs + Phaser.Math.Between(-5, 7), 9, 140);
 
-        helm.relayText.setText(`MOCK RELAY LOAD ${this.mockHelm.relayLoad}%`);
-        helm.pingText.setText(`MOCK RTT ${this.mockHelm.pingMs} ms`);
+        helm.relayText.setText(`MOCK SCOUT LOAD ${this.mockHelm.relayLoad}%`);
+        helm.pingText.setText(`MOCK RIDER RTT ${this.mockHelm.pingMs} ms`);
 
         if (this.connectionState.online && Math.random() > 0.7) {
-          this.addHelmEvent('info', 'helm', 'Patrol loop nominal (MOCK event)');
+          this.addHelmEvent('info', 'helm', 'Night watch reports all clear (MOCK)');
         }
       },
     });
@@ -580,7 +623,7 @@ class ShipScene extends Phaser.Scene {
       const entry = this.helmFeed[index];
       if (!entry) {
         line.setText('-');
-        line.setColor('#9be8ff');
+        line.setColor('#e9d1a6');
         return;
       }
       line.setText(entry.text);
@@ -594,8 +637,8 @@ class ShipScene extends Phaser.Scene {
 
       if (!isOnline) {
         room.background.setFillStyle(PALETTE.offline, 0.92);
-        room.background.setStrokeStyle(2, 0x4f5c66, 0.8);
-        room.titleStrip.setFillStyle(0x2b3640, 0.7);
+        room.background.setStrokeStyle(2, 0x66533f, 0.8);
+        room.titleStrip.setFillStyle(0x4d3b2a, 0.7);
       } else {
         room.background.setFillStyle(PALETTE.panelFill, 0.95);
         room.background.setStrokeStyle(2, PALETTE.panelStroke, 0.9);
@@ -647,11 +690,11 @@ class ShipScene extends Phaser.Scene {
       if (room.id === 'helm') {
         if (isOnline) {
           room.statusLamp.setFillStyle(PALETTE.good, 0.95);
-          room.connectionText.setText('UPLINK ONLINE');
+          room.connectionText.setText('SCOUTS ONLINE');
           room.connectionText.setColor('#7ef7d6');
         } else {
           room.statusLamp.setFillStyle(PALETTE.danger, 0.95);
-          room.connectionText.setText('UPLINK OFFLINE');
+          room.connectionText.setText('SCOUTS OFFLINE');
           room.connectionText.setColor('#ff9d9d');
         }
       }
@@ -667,7 +710,7 @@ class ShipScene extends Phaser.Scene {
     const backdrop = this.add.rectangle(0, 0, 420, 380, 0x120b1b, 0.96);
     backdrop.setStrokeStyle(2, PALETTE.accent, 0.8);
 
-    const header = this.add.text(0, -165, 'DRIVE HEALTH', {
+    const header = this.add.text(0, -165, 'GRANARY HEALTH', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#f3ebff',
@@ -721,7 +764,7 @@ class ShipScene extends Phaser.Scene {
       wordWrap: { width: 360 },
     }).setOrigin(0.5);
 
-    const hintText = this.add.text(0, 158, 'click the room again to close', {
+    const hintText = this.add.text(0, 158, 'click the chamber again to close', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#bfa9db',
@@ -750,7 +793,7 @@ class ShipScene extends Phaser.Scene {
 
       if (data.status === 'PASSED') {
         this.storageHealthBarFill.fillColor = PALETTE.good;
-        this.storageHealthLabel.setText('HEALTHY (SMART PASSED)');
+        this.storageHealthLabel.setText('SOUND (SMART PASSED)');
       } else if (data.status === 'FAILED') {
         this.storageHealthBarFill.fillColor = PALETTE.danger;
         this.storageHealthLabel.setText('FAILING (SMART FAILED)');
@@ -763,7 +806,7 @@ class ShipScene extends Phaser.Scene {
     } catch (error) {
       this.storageHealthBarFill.fillColor = PALETTE.warning;
       this.storageHealthLabel.setText('UNKNOWN');
-      this.storageHealthDetail.setText('Could not reach health endpoint.');
+      this.storageHealthDetail.setText('Could not reach granary health endpoint.');
       console.error('Drive health check failed', error);
     }
   }
@@ -808,7 +851,7 @@ class ShipScene extends Phaser.Scene {
     const backdrop = this.add.rectangle(0, 0, 460, 380, 0x120b1b, 0.96);
     backdrop.setStrokeStyle(2, PALETTE.accent, 0.8);
 
-    const header = this.add.text(0, -170, 'MEDIA POOL BREAKDOWN', {
+    const header = this.add.text(0, -170, 'STOREHOUSE BREAKDOWN', {
       fontFamily: 'monospace',
       fontSize: '18px',
       color: '#f3ebff',
@@ -870,7 +913,7 @@ class ShipScene extends Phaser.Scene {
       this.mediaListContainer.y = listLayout.y + this.mediaScrollOffset;
     });
 
-    const hintText = this.add.text(0, 165, 'scroll to browse - click the room again to close', {
+    const hintText = this.add.text(0, 165, 'scroll to browse - click the chamber again to close', {
       fontFamily: 'monospace',
       fontSize: '11px',
       color: '#bfa9db',
@@ -1042,7 +1085,7 @@ class ShipScene extends Phaser.Scene {
 
     this.mediaSummaryText.setText(mediaAvailable
       ? `Used: ${formatStorageValue(mediaUsed)}\nTotal: ${formatStorageValue(mediaTotal)}  Free: ${formatStorageValue(mediaFree)}`
-      : 'Media pool volume not mounted');
+      : 'Storehouse volume not mounted');
 
     if (cpu > 85 && !this.alertFlags.cpuHot) {
       this.alertFlags.cpuHot = true;
