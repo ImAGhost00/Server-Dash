@@ -1,19 +1,25 @@
 const PALETTE = {
-  bg: 0x120d09,
-  panelFill: 0x2a1c14,
-  panelStroke: 0xa88757,
-  titleBarFill: 0x49311f,
-  gridLine: 0x8c6a3f,
-  accent: 0xe2b56d,
-  accentBright: 0xffe2ac,
-  gaugeTrack: 0x3b281c,
+  bg: 0x182028,
+  skyTop: 0x7ea8cc,
+  skyBottom: 0xaed3eb,
+  grassA: 0x6ea650,
+  grassB: 0x5c8d45,
+  earth: 0x6f5534,
+  stone: 0x6d6a64,
+  panelFill: 0x2f241a,
+  panelStroke: 0xb79965,
+  titleBarFill: 0x4d3926,
+  gridLine: 0x96774c,
+  accent: 0xd9b777,
+  accentBright: 0xf8ddb1,
+  gaugeTrack: 0x473323,
   good: 0x8ccf7a,
   warning: 0xf9c74f,
   danger: 0xff6b6b,
   offline: 0x31261f,
 };
 
-const STAR_COLORS = [0xc9a674, 0xd6b989, 0xb89361, 0xe0c9a0];
+const STAR_COLORS = [0xf2e7c9, 0xdac693, 0xbd9f70, 0xceb17f];
 
 function formatStorageValue(gb) {
   if (gb >= 1024) {
@@ -88,7 +94,9 @@ class ShipScene extends Phaser.Scene {
 
   create() {
     this.cameras.main.setBackgroundColor(PALETTE.bg);
+    this.cameras.main.roundPixels = true;
 
+    this.createPixelWorldBackdrop();
     this.createStarfield();
     this.createStationFrame();
     this.createRoomModules();
@@ -106,6 +114,75 @@ class ShipScene extends Phaser.Scene {
     this.addHelmEvent('info', 'helm', 'Castle watch online (MOCK)');
     this.addHelmEvent('info', 'engine', 'Forge stewards await telemetry link');
     this.applyRoomPower(false);
+  }
+
+  createPixelWorldBackdrop() {
+    const { width, height } = this.scale;
+    const tile = 16;
+    const groundStartY = Math.floor(height * 0.56);
+    const bg = this.add.graphics().setDepth(-22);
+
+    for (let y = 0; y < groundStartY; y += tile) {
+      const lerp = y / groundStartY;
+      const top = Phaser.Display.Color.IntegerToColor(PALETTE.skyTop);
+      const bottom = Phaser.Display.Color.IntegerToColor(PALETTE.skyBottom);
+      const mix = Phaser.Display.Color.Interpolate.ColorWithColor(top, bottom, 100, lerp * 100);
+      const color = Phaser.Display.Color.GetColor(mix.r, mix.g, mix.b);
+      bg.fillStyle(color, 1);
+      bg.fillRect(0, y, width, tile);
+    }
+
+    for (let y = groundStartY; y < height; y += tile) {
+      const isAlt = Math.floor(y / tile) % 2 === 0;
+      bg.fillStyle(isAlt ? PALETTE.grassA : PALETTE.grassB, 1);
+      bg.fillRect(0, y, width, tile);
+    }
+
+    bg.fillStyle(PALETTE.earth, 1);
+    bg.fillRect(0, height - tile * 3, width, tile * 3);
+
+    const hills = this.add.graphics().setDepth(-20);
+    hills.fillStyle(0x6f8f67, 1);
+    for (let x = -tile; x < width + tile; x += tile) {
+      const hillHeight = Phaser.Math.Between(2, 6) * tile;
+      hills.fillRect(x, groundStartY - hillHeight, tile, hillHeight);
+    }
+
+    const road = this.add.graphics().setDepth(-19);
+    road.fillStyle(0x8e6f4a, 1);
+    for (let y = groundStartY; y < height; y += tile) {
+      const spread = Math.floor((y - groundStartY) / tile) * 8;
+      road.fillRect(width * 0.5 - 12 - spread, y, 24 + spread * 2, tile);
+    }
+
+    this.createKingdomSilhouette(width * 0.5, groundStartY - tile * 2, tile);
+  }
+
+  createKingdomSilhouette(centerX, baselineY, tile) {
+    const keep = this.add.graphics().setDepth(-18);
+    const wallColor = PALETTE.stone;
+    const shadowColor = 0x4f4c47;
+
+    keep.fillStyle(wallColor, 1);
+    keep.fillRect(centerX - tile * 7, baselineY - tile * 5, tile * 14, tile * 5);
+    keep.fillRect(centerX - tile * 3, baselineY - tile * 10, tile * 6, tile * 10);
+
+    keep.fillRect(centerX - tile * 10, baselineY - tile * 7, tile * 3, tile * 7);
+    keep.fillRect(centerX + tile * 7, baselineY - tile * 7, tile * 3, tile * 7);
+
+    keep.fillStyle(shadowColor, 1);
+    keep.fillRect(centerX - tile * 1, baselineY - tile * 5, tile * 2, tile * 5);
+
+    keep.fillStyle(0x3d2e1f, 1);
+    keep.fillRect(centerX - tile, baselineY - tile * 2, tile * 2, tile * 2);
+
+    keep.fillStyle(wallColor, 1);
+    for (let i = -7; i < 7; i += 2) {
+      keep.fillRect(centerX + i * tile, baselineY - tile * 6, tile, tile);
+    }
+    for (let i = -3; i < 3; i += 2) {
+      keep.fillRect(centerX + i * tile, baselineY - tile * 11, tile, tile);
+    }
   }
 
   update(time, delta) {
@@ -167,15 +244,14 @@ class ShipScene extends Phaser.Scene {
 
   createStarfield() {
     const { width, height } = this.scale;
-    this.starLayer = this.add.container(0, 0).setDepth(-12);
+    this.starLayer = this.add.container(0, 0).setDepth(-14);
 
-    for (let i = 0; i < 160; i += 1) {
+    for (let i = 0; i < 90; i += 1) {
       const x = Phaser.Math.Between(0, width);
-      const y = Phaser.Math.Between(0, height);
-      const radius = Phaser.Math.FloatBetween(0.7, 2.2);
-      const alpha = Phaser.Math.FloatBetween(0.2, 0.9);
-      const dot = this.add.circle(x, y, radius, Phaser.Utils.Array.GetRandom(STAR_COLORS), alpha);
-      dot.starSpeed = Phaser.Math.FloatBetween(4, 26);
+      const y = Phaser.Math.Between(0, Math.floor(height * 0.55));
+      const size = Phaser.Math.Between(1, 2) * 2;
+      const dot = this.add.rectangle(x, y, size, size, Phaser.Utils.Array.GetRandom(STAR_COLORS), Phaser.Math.FloatBetween(0.18, 0.5));
+      dot.starSpeed = Phaser.Math.FloatBetween(5, 18);
       dot.parallaxScale = Phaser.Math.FloatBetween(0.85, 1.25);
       this.starLayer.add(dot);
       this.starDots.push(dot);
@@ -188,10 +264,10 @@ class ShipScene extends Phaser.Scene {
 
     this.starDots.forEach((dot) => {
       dot.x -= dot.starSpeed * drift * dot.parallaxScale;
-      dot.y += Math.sin((dot.x + dot.y) * 0.002) * 0.03 * delta;
+      dot.y += Math.sin((dot.x + dot.y) * 0.002) * 0.015 * delta;
       if (dot.x < -5) {
         dot.x = width + Phaser.Math.Between(4, 18);
-        dot.y = Phaser.Math.Between(0, height);
+        dot.y = Phaser.Math.Between(0, Math.floor(height * 0.55));
       }
     });
   }
@@ -199,38 +275,38 @@ class ShipScene extends Phaser.Scene {
   createStationFrame() {
     const { width, height } = this.scale;
 
-    this.add.text(width * 0.5, height * 0.07, 'KINGDOM COMMAND TABLE', {
+    this.add.text(width * 0.5, height * 0.07, 'KINGDOM PLAINS WATCH', {
       fontFamily: 'monospace',
       fontSize: '30px',
       color: '#f2ddba',
     }).setOrigin(0.5);
 
-    this.add.text(width * 0.5, height * 0.106, 'RIMWORLD STYLE KEEP OVERWATCH', {
+    this.add.text(width * 0.5, height * 0.106, 'PIXEL COLONY STATUS BOARD', {
       fontFamily: 'monospace',
       fontSize: '12px',
       color: '#cba779',
     }).setOrigin(0.5);
 
-    const hull = this.add.graphics();
-    hull.lineStyle(2, PALETTE.gridLine, 0.28);
-    hull.strokeRoundedRect(width * 0.06, height * 0.14, width * 0.88, height * 0.76, 18);
+    const hull = this.add.graphics().setDepth(-2);
+    hull.lineStyle(2, PALETTE.gridLine, 0.42);
+    hull.strokeRect(width * 0.06, height * 0.14, width * 0.88, height * 0.76);
 
-    hull.lineStyle(1, PALETTE.gridLine, 0.12);
-    for (let x = 0; x <= 12; x += 1) {
-      const px = width * (0.08 + (x / 12) * 0.84);
+    hull.lineStyle(1, PALETTE.gridLine, 0.2);
+    for (let x = 0; x <= 18; x += 1) {
+      const px = width * (0.08 + (x / 18) * 0.84);
       hull.lineBetween(px, height * 0.16, px, height * 0.88);
     }
 
-    for (let y = 0; y <= 9; y += 1) {
-      const py = height * (0.16 + (y / 9) * 0.72);
+    for (let y = 0; y <= 12; y += 1) {
+      const py = height * (0.16 + (y / 12) * 0.72);
       hull.lineBetween(width * 0.08, py, width * 0.92, py);
     }
 
-    const corridor = this.add.graphics();
+    const corridor = this.add.graphics().setDepth(-1);
     corridor.fillStyle(0x3a281b, 0.7);
-    corridor.fillRoundedRect(width * 0.43, height * 0.37, width * 0.14, height * 0.18, 16);
+    corridor.fillRect(width * 0.43, height * 0.37, width * 0.14, height * 0.18);
     corridor.lineStyle(1, PALETTE.panelStroke, 0.4);
-    corridor.strokeRoundedRect(width * 0.43, height * 0.37, width * 0.14, height * 0.18, 16);
+    corridor.strokeRect(width * 0.43, height * 0.37, width * 0.14, height * 0.18);
   }
 
   createRoomModules() {
