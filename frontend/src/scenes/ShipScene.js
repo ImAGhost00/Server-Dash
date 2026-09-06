@@ -48,10 +48,19 @@ class ShipScene extends Phaser.Scene {
 
     this.wsUrl = `${socketProtocol}://${socketHost}/ws`;
     this.roomRegistry = [
-      { id: 'helm', name: 'War Table', x: 0.5, y: 0.25, width: 0.5, height: 0.24 },
-      { id: 'engine', name: 'Forge', x: 0.28, y: 0.6, width: 0.36, height: 0.46 },
-      { id: 'storage', name: 'Granary', x: 0.71, y: 0.6, width: 0.42, height: 0.46 },
+      { id: 'helm', name: 'War Table', x: 0.29, y: 0.24, width: 0.36, height: 0.2, type: 'core' },
+      { id: 'engine', name: 'Forge', x: 0.2, y: 0.58, width: 0.2, height: 0.34, type: 'core' },
+      { id: 'storage', name: 'Granary', x: 0.41, y: 0.58, width: 0.2, height: 0.34, type: 'core' },
+      { id: 'jellyfin', name: 'Jellyfin Hall', x: 0.67, y: 0.25, width: 0.18, height: 0.14, type: 'service' },
+      { id: 'qbittorrent', name: 'Torrent Works', x: 0.84, y: 0.25, width: 0.18, height: 0.14, type: 'service' },
+      { id: 'sonarr', name: 'Sonarr Watch', x: 0.67, y: 0.42, width: 0.18, height: 0.14, type: 'service' },
+      { id: 'radarr', name: 'Radarr Watch', x: 0.84, y: 0.42, width: 0.18, height: 0.14, type: 'service' },
+      { id: 'prowlarr', name: 'Prowlarr Post', x: 0.67, y: 0.59, width: 0.18, height: 0.14, type: 'service' },
+      { id: 'overseerr', name: 'Seer Desk', x: 0.84, y: 0.59, width: 0.18, height: 0.14, type: 'service' },
+      { id: 'adguard', name: 'Gate Ward', x: 0.67, y: 0.76, width: 0.18, height: 0.14, type: 'service' },
+      { id: 'portainer', name: 'Dockmaster', x: 0.84, y: 0.76, width: 0.18, height: 0.14, type: 'service' },
     ];
+    this.serviceRoomIds = this.roomRegistry.filter((room) => room.type === 'service').map((room) => room.id);
 
     this.metrics = {
       cpu_percent: 0,
@@ -88,6 +97,17 @@ class ShipScene extends Phaser.Scene {
       diskHot: false,
     };
 
+    this.serviceTelemetry = {
+      jellyfin: { online: true, load: 24, detailA: 'MOCK viewers 3', detailB: 'MOCK stream 14 MB/s' },
+      qbittorrent: { online: true, load: 42, detailA: 'MOCK queue 11', detailB: 'MOCK down 19 MB/s' },
+      sonarr: { online: true, load: 18, detailA: 'MOCK tasks 2', detailB: 'MOCK grabs 1/h' },
+      radarr: { online: true, load: 16, detailA: 'MOCK tasks 1', detailB: 'MOCK grabs 0/h' },
+      prowlarr: { online: true, load: 12, detailA: 'MOCK indexers 7', detailB: 'MOCK ping 82 ms' },
+      overseerr: { online: true, load: 22, detailA: 'MOCK reqs 4', detailB: 'MOCK wait 11m' },
+      adguard: { online: true, load: 33, detailA: 'MOCK blocked 67%', detailB: 'MOCK dns 9 ms' },
+      portainer: { online: true, load: 14, detailA: 'MOCK stacks 9', detailB: 'MOCK drift none' },
+    };
+
     this.starDots = [];
     this.colonistPawns = [];
   }
@@ -102,6 +122,7 @@ class ShipScene extends Phaser.Scene {
     this.createRoomModules();
     this.createColonistPawns();
     this.startHelmMockTicker();
+    this.startServiceMockTicker();
 
     this.connectSocket();
 
@@ -349,6 +370,10 @@ class ShipScene extends Phaser.Scene {
       if (config.id === 'helm') {
         this.createHelmRoom(room);
       }
+
+      if (config.type === 'service') {
+        this.createServiceRoom(room, config);
+      }
     });
 
     this.createStorageWindow();
@@ -546,6 +571,41 @@ class ShipScene extends Phaser.Scene {
     });
   }
 
+  createServiceRoom(room, config) {
+    const baseX = room.x - room.width / 2 + 12;
+    const titleY = room.y - room.height / 2 + 18;
+
+    room.serviceLamp = this.add.rectangle(baseX, titleY, 8, 8, PALETTE.good, 0.9).setOrigin(0, 0.5);
+    room.serviceTitle = this.add.text(baseX + 14, titleY, config.name.toUpperCase(), {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#f4dfba',
+    }).setOrigin(0, 0.5);
+
+    room.serviceA = this.add.text(baseX, room.y - 2, 'MOCK init', {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#e9d1a6',
+    }).setOrigin(0, 0.5);
+
+    room.serviceB = this.add.text(baseX, room.y + 14, 'MOCK init', {
+      fontFamily: 'monospace',
+      fontSize: '10px',
+      color: '#e9d1a6',
+    }).setOrigin(0, 0.5);
+
+    room.serviceBarTrack = this.add.rectangle(room.x, room.y + room.height / 2 - 14, room.width - 24, 8, PALETTE.gaugeTrack, 1)
+      .setStrokeStyle(1, PALETTE.panelStroke, 0.6);
+    room.serviceBarFill = this.add.rectangle(room.x - room.width / 2 + 13, room.y + room.height / 2 - 14, 0, 6, PALETTE.accent, 1)
+      .setOrigin(0, 0.5);
+
+    room.serviceStatus = this.add.text(room.x + room.width / 2 - 12, room.y + room.height / 2 - 28, 'MOCK', {
+      fontFamily: 'monospace',
+      fontSize: '9px',
+      color: '#f2bd69',
+    }).setOrigin(1, 0.5);
+  }
+
   createModuleRoom(roomConfig) {
     const { width, height } = this.scale;
     const roomX = width * roomConfig.x;
@@ -616,7 +676,7 @@ class ShipScene extends Phaser.Scene {
       return Math.random() > 0.35 ? 'storage' : 'helm';
     }
 
-    return Phaser.Math.RND.pick(['engine', 'storage', 'helm']);
+    return Phaser.Math.RND.pick(['engine', 'storage', 'helm', ...this.serviceRoomIds]);
   }
 
   updateColonistPawns(delta) {
@@ -671,6 +731,67 @@ class ShipScene extends Phaser.Scene {
           this.addHelmEvent('info', 'helm', 'Night watch reports all clear (MOCK)');
         }
       },
+    });
+  }
+
+  startServiceMockTicker() {
+    this.time.addEvent({
+      delay: 2400,
+      loop: true,
+      callback: () => {
+        this.serviceRoomIds.forEach((serviceId) => {
+          const state = this.serviceTelemetry[serviceId];
+          if (!state) {
+            return;
+          }
+
+          state.load = Phaser.Math.Clamp(state.load + Phaser.Math.Between(-9, 10), 2, 98);
+
+          if (this.connectionState.online) {
+            if (Math.random() > 0.93) {
+              state.online = false;
+              this.addHelmEvent('warn', serviceId, 'service went dark (MOCK)');
+            } else if (!state.online && Math.random() > 0.45) {
+              state.online = true;
+              this.addHelmEvent('info', serviceId, 'service restored (MOCK)');
+            }
+          } else {
+            state.online = false;
+          }
+        });
+
+        this.updateServiceRooms();
+      },
+    });
+  }
+
+  updateServiceRooms() {
+    this.serviceRoomIds.forEach((serviceId) => {
+      const room = this.roomMap.get(serviceId);
+      const state = this.serviceTelemetry[serviceId];
+      if (!room || !state) {
+        return;
+      }
+
+      room.serviceA.setText(state.detailA);
+      room.serviceB.setText(state.detailB);
+      room.serviceBarFill.width = (room.width - 24) * (state.load / 100);
+
+      if (!this.connectionState.online || !state.online) {
+        room.serviceLamp.fillColor = PALETTE.danger;
+        room.serviceA.setColor('#ff9d9d');
+        room.serviceB.setColor('#ff9d9d');
+        room.serviceStatus.setText('OFFLINE');
+        room.serviceStatus.setColor('#ff9d9d');
+        room.serviceBarFill.fillColor = 0x6d3a31;
+      } else {
+        room.serviceLamp.fillColor = state.load > 80 ? PALETTE.warning : PALETTE.good;
+        room.serviceA.setColor('#e9d1a6');
+        room.serviceB.setColor('#e9d1a6');
+        room.serviceStatus.setText('MOCK');
+        room.serviceStatus.setColor('#f2bd69');
+        room.serviceBarFill.fillColor = state.load > 80 ? PALETTE.warning : PALETTE.accent;
+      }
     });
   }
 
@@ -774,7 +895,25 @@ class ShipScene extends Phaser.Scene {
           room.connectionText.setColor('#ff9d9d');
         }
       }
+
+      if (room.id !== 'helm' && room.id !== 'engine' && room.id !== 'storage' && room.serviceStatus) {
+        if (!isOnline) {
+          room.serviceLamp.fillColor = PALETTE.danger;
+          room.serviceA.setText('MOCK signal lost');
+          room.serviceB.setText('MOCK waiting link');
+          room.serviceA.setColor('#ff9d9d');
+          room.serviceB.setColor('#ff9d9d');
+          room.serviceStatus.setText('OFFLINE');
+          room.serviceStatus.setColor('#ff9d9d');
+          room.serviceBarFill.width = 0;
+          room.serviceBarFill.fillColor = 0x6d3a31;
+        }
+      }
     });
+
+    if (isOnline) {
+      this.updateServiceRooms();
+    }
   }
 
   createStorageWindow() {
@@ -1187,6 +1326,8 @@ class ShipScene extends Phaser.Scene {
       this.alertFlags.diskHot = false;
       this.addHelmEvent('info', 'storage', 'Disk pressure reduced');
     }
+
+    this.updateServiceRooms();
   }
 }
 
