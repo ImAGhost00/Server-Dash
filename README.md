@@ -1,25 +1,30 @@
-# Spaceship Station
+# Ghost Dash
 
-A Docker-ready Phase 1 prototype for a real-time homelab server monitoring dashboard styled as a 2D cutaway spaceship station.
+Milestone 1: a hardware stats monitor backend.
 
-## Stack
-- Backend: FastAPI + WebSocket telemetry
-- Frontend: static HTML + Tailwind CDN + Phaser 3
-- Proxy: Nginx
-- Orchestration: Docker Compose
+## What it does
 
-## Run locally
+- Starts a Node.js Express server
+- Attaches Socket.io for websocket updates
+- Reads current CPU load and RAM usage with `systeminformation`
+- Emits hardware stats every 2 seconds
+- Reads disk usage from the host mount at `/hostfs` for future Storage-room work
+
+## Run
+
 ```bash
-docker compose up --build
+npm install
+npm start
 ```
 
-Then visit:
-- http://localhost
-- http://localhost:8000/health
+## Project layout
 
-## Included features
-- Ship hull visualization and engine room cutaway
-- CPU, RAM, and disk telemetry from host metrics
-- Animated engine pulse tied to live CPU load
-- Warning tint for CPU over 80%
-- Room registry pattern for future modules like qbittorrent, jellyfin, sonarr, radarr, and seerr
+- `src/server.js` owns the HTTP server and Socket.io wiring
+- `src/services/systemStats.js` fetches hardware stats
+- `src/services/systemStats.js` also exposes host disk reads from `/hostfs`
+- `src/realtime/hardwareStream.js` emits stats on an interval
+- `src/client/phaser/serverRoomScene.js` draws the Phaser grid background
+- `src/client/components/HudOverlay.jsx` renders the live React HUD
+- `src/client/hooks/useHardwareStats.js` subscribes to Socket.io telemetry
+- `src/modules/storage/` is reserved for the future Storage module
+- `src/modules/qbittorrent/` is reserved for the future qBittorrent module

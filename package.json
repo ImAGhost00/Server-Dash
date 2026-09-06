@@ -1,0 +1,27 @@
+{
+  "name": "ghost-dash",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "dev:client": "vite --host",
+    "build:client": "vite build"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "phaser": "^3.90.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "systeminformation": "^5.27.14"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.4.10"
+  }
+}
