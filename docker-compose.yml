@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  server-dashboard:
+    build: .
+    container_name: server-dashboard
+    restart: unless-stopped
+    ports:
+      - "3030:3030" # The port you will use to access the dashboard
+    pid: "host" # Crucial: Allows the container to read accurate host CPU/RAM stats
+    volumes:
+      # Mount the Docker socket so the backend can read Portainer/container logs later
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount the host filesystem read-only so the backend can calculate actual disk space
+      - /:/hostfs:ro 
+    environment:
+      - PORT=3030
+      - NODE_ENV=production
