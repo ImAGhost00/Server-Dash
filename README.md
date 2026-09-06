@@ -17,6 +17,8 @@ npm install
 npm start
 ```
 
+The app is currently being tested at `http://192.168.69.1:3030`.
+
 ## Project layout
 
 - `src/server.js` owns the HTTP server and Socket.io wiring
