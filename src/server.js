@@ -1,6 +1,8 @@
 import http from 'node:http';
 
 import express from 'express';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { Server } from 'socket.io';
 
 import { getHostDiskStats } from './services/systemStats.js';
@@ -32,6 +34,26 @@ app.get('/api/storage/disk', async (_request, response) => {
     });
   }
 });
+
+const clientDistPath = join(process.cwd(), 'dist', 'client');
+
+if (existsSync(clientDistPath)) {
+  app.use(express.static(clientDistPath));
+
+  app.get('*', (request, response, next) => {
+    if (request.path.startsWith('/api/')) {
+      next();
+      return;
+    }
+
+    if (!existsSync(join(clientDistPath, 'index.html'))) {
+      next();
+      return;
+    }
+
+    response.sendFile(join(clientDistPath, 'index.html'));
+  });
+}
 
 io.on('connection', (socket) => {
   socket.emit('server:ready', {

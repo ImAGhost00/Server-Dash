@@ -7,6 +7,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "dev:client": "vite --host",
+    "build": "vite build",
     "build:client": "vite build"
   },
   "dependencies": {
